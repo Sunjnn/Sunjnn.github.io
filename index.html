@@ -69,6 +69,289 @@
       <div class="outer">
         <section id="main">
   
+    <article id="post-merge-sort" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2024/09/28/merge-sort/" class="article-date">
+  <time class="dt-published" datetime="2024-09-28T02:11:40.000Z" itemprop="datePublished">2024-09-28</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2024/09/28/merge-sort/">merge_sort</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <p>本篇介绍 <a target="_blank" rel="noopener" href="https://github.com/NVIDIA/cuda-samples">cuda samples</a> 中的 <a target="_blank" rel="noopener" href="https://github.com/NVIDIA/cuda-samples/tree/master/Samples/0_Introduction/mergeSort">mergeSort</a>.</p>
+<p>大体上来讲,
+mergeSort 分为两个阶段.</p>
+<ol>
+<li>对含有 <code>SHARED_SIZE_LIMIT</code> (即 1024) 个元素的数组进行排序.</li>
+<li>合并多个有序数组.</li>
+</ol>
+<p>其中第一个阶段调用一次函数 <code>mergeSortShared</code> 结束.
+而第二个阶段需要循环调用三个函数: <code>generateSampleRanks</code>, <code>mergeRanksAndIndices</code> 和 <code>mergeElementaryIntervals</code>.
+我将分别讲述这两个阶段.</p>
+<h2 id="第一阶段-段内排序"><a href="#第一阶段-段内排序" class="headerlink" title="第一阶段: 段内排序"></a>第一阶段: 段内排序</h2><p>函数 <code>mergeSortShared</code> 比较简单,
+就是对完整的数据执行 <code>mergeSortSharedKernel</code> 函数.
+其函数声明为</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">template &lt;uint sortDir&gt;</span><br><span class="line">__global__ void mergeSortSharedKernel(uint *d_DstKey, uint *d_DstVal,</span><br><span class="line">                                      uint *d_SrcKey, uint *d_SrcVal,</span><br><span class="line">                                      uint arrayLength);</span><br></pre></td></tr></table></figure>
+
+<p>该 kernel 函数对一个长为 <code>arrayLength</code> 的数组排序,
+在代码中 <code>arrayLength</code> 接收的参数为宏变量 <code>SHARED_SIZE_LIMIT</code> (即 1024).
+调用该函数的 grid 和 block 大小分别为 <code>N / arrayLength</code> 和 <code>arrayLength / 2</code>.
+每个 block 排序一段长为 <code>arrayLength</code> 的数组.</p>
+<p>在函数 <code>mergeSortSharedKernel</code> 中排序通过一个循环进行.
+该循环在长度为 <code>stride</code> 的数组已经排序基础上,
+将 2 个长为 <code>stride</code> 的数组进行合并.
+因此 <code>stride</code> 的大小从 1 开始每次增大 1 倍直到 <code>arrayLength / 2</code>.
+在循环开始之前,
+长度 <code>stride</code> 的数组已经是排序了的状态.</p>
+<p>循环中数量为 <code>stride</code> 的 thread 为一组,
+排序相邻的两个长为 <code>stride</code> 的数组,
+记前一个数组为 <code>A</code>,
+后一个数组为 <code>B</code>.
+因此需要计算每一组 thread 内部的 thread ID 以及这组 thread 对应数据的起始位置.</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 计算组内 thread ID, [0, thread)</span></span><br><span class="line">uint lPos = thread &amp; (stride - <span class="number">1</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 计算该组 thread 对应数据的起始位置</span></span><br><span class="line"><span class="comment">// 每组 thread 处理连续的两个 thread 数组</span></span><br><span class="line">uint *baseKey = s_key + <span class="number">2</span> * (threadIdx.x - lPos);</span><br></pre></td></tr></table></figure>
+
+<p>相对应的,
+每个 thread 在两个数组中都有一个对应的数据,
+分别为 <code>keyA</code> 和 <code>keyB</code>.</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">uint keyA = baseKey[lPos + <span class="number">0</span>];</span><br><span class="line">uint keyB = baseKey[lPos + stride];</span><br></pre></td></tr></table></figure>
+
+<p>接下来找到 <code>keyA</code> 和 <code>keyB</code> 在两个数组合并后的位置.
+因为数组 <code>A</code> 和数组 <code>B</code> 都是排序的,
+因此在数组 <code>A</code> 中有 <code>lPos</code> 个数比 <code>keyA</code> 小,
+只需要找到在数组 <code>B</code> 中有多少个数比 <code>keyA</code> 小,
+两者相加就得到了 <code>keyA</code> 合并后的位置.
+这个寻找的过程可以通过二分法查找.
+<code>keyB</code> 同理也能找到合并后的位置.
+但是这里有个问题就是某个 thread 对应的 <code>keyA</code> 和 <code>keyB</code> 相同,
+那么这样计算得到的最后的位置也是相同的,
+产生了冲突.</p>
+<p>代码中解决这个可能的冲突的方法是 <code>keyA</code> 在数组 <code>B</code> 中寻找小于 <code>keyA</code> 的数,
+<code>keyB</code> 在数组 <code>A</code> 中寻找小于等于 <code>keyB</code> 的数.
+这样做的好处是保持了排序的稳定性.
+数组 <code>A</code> 的元素总是排在数组 <code>B</code> 的相同元素之前.</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">uint posA = <span class="built_in">binarySearchExclusive</span>&lt;sortDir&gt;(keyA, baseKey + stride, stride, stride) + lPos;</span><br><span class="line">uint posB = <span class="built_in">binarySearchInclusive</span>&lt;sortDir&gt;(KeyB, baseKey + <span class="number">0</span>, stride, stride) + lPos;</span><br></pre></td></tr></table></figure>
+
+<p>函数 <code>binarySearchExclusive</code> 和 <code>binarySearchInclusive</code> 有着相似的结构,
+只有内部的微弱区别.
+通过二分法查找 <code>val</code> 在数组中的位置,
+即返回数组中小于 (<code>binarySearchExclusive</code>) 或小于等于 (binarySearchInclusive) <code>val</code> 的元素的数量.</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// val 待查找的元素</span></span><br><span class="line"><span class="comment">// data 数组起始位置</span></span><br><span class="line"><span class="comment">// L 数组长度</span></span><br><span class="line"><span class="comment">// stride &gt;= L, 并行是 2 的整数幂</span></span><br><span class="line"><span class="keyword">template</span> &lt;uint sortDir&gt;</span><br><span class="line"><span class="function"><span class="type">static</span> <span class="keyword">inline</span> __device__ uint <span class="title">binarySearchExclusive</span><span class="params">(uint val, uint *data,</span></span></span><br><span class="line"><span class="params"><span class="function">                                                    uint L, uint stride)</span> </span>&#123;</span><br><span class="line">  <span class="keyword">if</span> (L == <span class="number">0</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  uint pos = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">for</span> (; stride &gt; <span class="number">0</span>; stride &gt;&gt;= <span class="number">1</span>) &#123;</span><br><span class="line">    uint newPos = <span class="built_in">umin</span>(pos + stride, L);</span><br><span class="line"></span><br><span class="line">	<span class="comment">// binarySearchInclusive 这里的 &lt; 变成 &lt;=</span></span><br><span class="line">    <span class="keyword">if</span> ((sortDir &amp;&amp; (data[newPos - <span class="number">1</span>] &lt; val)) ||</span><br><span class="line">        (!sortDir &amp;&amp; (data[newPos - <span class="number">1</span>] &gt; val))) &#123;</span><br><span class="line">      pos = newPos;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> pos;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>merge sort 的第一个阶段就完成了.
+该阶段将每 <code>SHARED_SIZE_LIMIT</code> (即 1024) 个元素进行排序,
+得到了 <code>N / SHARED_SIZE_LIMIT</code> 个有序数组.</p>
+<h2 id="第二阶段-合并有序段"><a href="#第二阶段-合并有序段" class="headerlink" title="第二阶段: 合并有序段"></a>第二阶段: 合并有序段</h2><p>第二个阶段循环合并连续 2 个长为 <code>stride</code> 的有序数组.
+因此 <code>stride</code> 的大小从 <code>SHARED_SIZE_LIMIT</code> (即 1024) 开始每次增大 1 倍直到 <code>N</code>.
+这个阶段主要分成三个部分: 生成排序, 合并排序和合并.
+也就是调用三个函数 <code>generateSampleRanks</code>, <code>mergeRanksAndIndices</code> 和 <code>mergeElementaryIntervals</code>.</p>
+<h3 id="思路解析"><a href="#思路解析" class="headerlink" title="思路解析"></a>思路解析</h3><p>要合并 2 个连续的有序数组,
+当然可以像第一阶段一样启动足够多的线程查找每个元素合并后的位置.
+但是这样的方法在后期的时延会增加很多,
+因为 <code>stride</code> 长度倍增.
+这里采用的方法是先分组再查找.
+要理解这部分的代码,
+需要理解数组 <code>d_RanksA</code>, <code>d_RanksB</code>, <code>d_LimitsA</code> 和 <code>d_LimitsB</code>.
+这个会在后面详细讲解.</p>
+<p>先把 <code>stride</code> 分为大小为 <code>SAMPLE_STRIDE</code> 的子数组.
+<code>d_RanksA</code> 表示 2 个 <code>stride</code> 中所有的子数组的起始元素在 <code>stride A</code> 中的位置,
+即 <code>A</code> 中小于 (或小于等于) 某个起始元素的元素数.
+这一部分对应的就是函数 <code>generateSampleRanks</code> 的部分.</p>
+<p>接着把 <code>d_RanksA</code> 排序,
+将排序后的值填入对应的 <code>d_LimitsA</code> 中.
+这一部分对应的就是函数 <code>mergeRanksAndIndices</code> 的部分.</p>
+<p>经过前两步,
+就把 <code>A</code> 和 <code>B</code> 每个都分为了 $2 \times stride &#x2F; SAMPLE_STRIDE$ 个范围.
+之后合并对应的范围就得到 2 个 <code>stride</code> 合并后的结果.
+这一部分对应的就是函数 <code>mergeElementaryIntervals</code>.</p>
+<h3 id="代码解析"><a href="#代码解析" class="headerlink" title="代码解析"></a>代码解析</h3><h4 id="generateSamplesRanks"><a href="#generateSamplesRanks" class="headerlink" title="generateSamplesRanks"></a>generateSamplesRanks</h4><p>这一步生成 <code>d_RanksA</code> 和 <code>d_RanksB</code>.
+通过 kernel 函数 <code>generateSampleRanksKernel</code> 实现的.
+无论 <code>stride</code> 大小,
+该 kernel 函数的总线程数都不变.
+就是 $N &#x2F; (2 \times SAMPLE_STRIDE)$.</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 计算总线程数量</span></span><br><span class="line">uint lastSegmentElements = N % (<span class="number">2</span> * stride);</span><br><span class="line">uint threadCount =</span><br><span class="line">	(lastSegmentElements &gt; stride)</span><br><span class="line">	    ? (N + <span class="number">2</span> * stride - lastSegmentElements) / (<span class="number">2</span> * SAMPLE_STRIDE)</span><br><span class="line">        : (N - lastSegmentElements) / (<span class="number">2</span> * SAMPLE_STRIDE);</span><br></pre></td></tr></table></figure>
+
+<p>调用函数 <code>generateSampleRanksKernel</code> 的 grid 大小为 <code>threadCount / 256</code>,
+block 大小为 256.
+在该 kernel 函数中,
+把所有的线程分组.
+每 <code>stride / SAMPLE_STRIDE</code> 个线程组成一组.
+因此,
+每个线程的全局 ID 和组内 ID 可以通过如下方式计算.</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 线程的全局 ID</span></span><br><span class="line">uint pos = blockIdx.x * blockDim.x + threadIdx.x;</span><br><span class="line"></span><br><span class="line"><span class="comment">// stride / SAMPLE_STRIDE 个线程为一组</span></span><br><span class="line"><span class="comment">// 线程的组内 ID</span></span><br><span class="line"><span class="type">const</span> uint i = pos &amp; ((stride / SAMPLE_STRIDE) - <span class="number">1</span>);</span><br></pre></td></tr></table></figure>
+
+<p>每个 thread 对应两个长为 <code>SAMPLE_STRIDE</code> 的数组以及 <code>d_RanksA</code> 和 <code>d_RanksB</code> 中的两个元素,
+就可以计算每个线程组的数据偏移量.</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 计算每个线程组的数据偏移量</span></span><br><span class="line"><span class="type">const</span> uint segmentBase = (pos - i) * (<span class="number">2</span> * SAMPLE_STRIDE);</span><br><span class="line">d_SrcKey += segmentBase;</span><br><span class="line">d_RanksA += segmentBase / SAMPLE_STRIDE;</span><br><span class="line">d_RanksB += segmentBase / SAMPLE_STRIDE;</span><br></pre></td></tr></table></figure>
+
+<p>每个线程组对应连续 2 个长为 <code>stride</code> 的数组,
+前一个数组称为数组 <code>A</code>,
+后一个称为 <code>B</code>.
+每个线程在 <code>A</code> 和 <code>B</code> 中都有对应的一个长为 <code>SAMPLE_STRIDE</code> 的子数组.
+就可以计算得到 <code>A</code> 和 <code>B</code> 的长度以及子数组的个数.</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// A 和 B 的长度</span></span><br><span class="line"><span class="type">const</span> uint segmentElementsA = stride;</span><br><span class="line"><span class="type">const</span> uint segmentElementsB = <span class="built_in">umin</span>(stride, N - segmentBase - stride);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 子数组的个数</span></span><br><span class="line"><span class="type">const</span> uint segmentSamplesA = <span class="built_in">getSampleCount</span>(segmentElementsA);</span><br><span class="line"><span class="type">const</span> uint segmentSamplesB = <span class="built_in">getSampleCount</span>(segmentElementsB);</span><br></pre></td></tr></table></figure>
+
+<p>最后求在 <code>A</code> 和 <code>B</code> 两个数组中,
+小于 (或者小于等于) 每个子数组起始元素的元素数.
+这也是通过 <code>binarySearchExclusive</code> 和 <code>binarySearchInclusive</code> 两个 kernel 函数完成.</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (i &lt; segmentSamplesA) &#123;</span><br><span class="line">	d_RanksA[i] = i * SAMPLE_STRIDE;</span><br><span class="line">    d_RanksB[i] = <span class="built_in">binarySearchExclusive</span>&lt;sortDir&gt;(</span><br><span class="line">        d_SrcKey[i * SAMPLE_STRIDE], d_SrcKey + stride, segmentElementsB,</span><br><span class="line">        <span class="built_in">nextPowerOfTwo</span>(segmentElementsB));</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> (i &lt; segmentSamplesB) &#123;</span><br><span class="line">    d_RanksB[(stride / SAMPLE_STRIDE) + i] = i * SAMPLE_STRIDE;</span><br><span class="line">    d_RanksA[(stride / SAMPLE_STRIDE) + i] = <span class="built_in">binarySearchInclusive</span>&lt;sortDir&gt;(</span><br><span class="line">        d_SrcKey[stride + i * SAMPLE_STRIDE], d_SrcKey + <span class="number">0</span>, segmentElementsA,</span><br><span class="line">        <span class="built_in">nextPowerOfTwo</span>(segmentElementsA));</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<h4 id="mergeRanksAndIndices"><a href="#mergeRanksAndIndices" class="headerlink" title="mergeRanksAndIndices"></a>mergeRanksAndIndices</h4><p>这一步把 <code>d_RanksA</code> 和 <code>d_RanksB</code> 中的内容排序后赋值给 <code>d_LimitsA</code> 和 <code>d_LimitsB</code>.</p>
+<p>对 <code>A</code> 和 <code>B</code> 分别调用 kernel 函数 <code>mergeRanksAndIndicesKernel</code>,
+通过 <code>d_RanksA</code> 生成 <code>d_LimitsA</code>.
+该 kernel 函数有大小 <code>&lt;&lt;&lt;threadCount / 256, 256&gt;&gt;&gt;</code>.
+其中 <code>threadCount = N / (2 * SAMPLE_STRIDE)</code>.</p>
+<p>同样 <code>stride / SAMPLE_STRIDE</code> 个 thread 为一组.
+计算组内 ID 和数组偏移同之前一样.</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// thread ID</span></span><br><span class="line">uint pos = blockIdx.x * blockDim.x + threadIdx.x;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 组内 ID</span></span><br><span class="line"><span class="type">const</span> uint i = pos &amp; ((stride / SAMPLE_STRIDE) - <span class="number">1</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 数组偏移</span></span><br><span class="line"><span class="type">const</span> uint segmentBase = (pos - i) * (<span class="number">2</span> * SAMPLE_STRIDE);</span><br><span class="line">d_Ranks += (pos - i) * <span class="number">2</span>;</span><br><span class="line">d_Limits += (pos - i) * <span class="number">2</span>;</span><br></pre></td></tr></table></figure>
+
+<p>需要将 <code>d_RanksA</code> 排序.
+对 <code>A</code> 中的每个 <code>d_RanksA</code> 查找其在 <code>B</code> 中的位置.</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (i &lt; segmentSamplesA) &#123;</span><br><span class="line">    uint dstPos = <span class="built_in">binarySearchExclusive</span>&lt;<span class="number">1U</span>&gt;(</span><br><span class="line">                      d_Ranks[i], d_Ranks + segmentSamplesA, segmentSamplesB,</span><br><span class="line">                      <span class="built_in">nextPowerOfTwo</span>(segmentSamplesB)) +</span><br><span class="line">                  i;</span><br><span class="line">    d_Limits[dstPos] = d_Ranks[i];</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>同样,
+对 <code>B</code> 中的每个 <code>d_RanksA</code> 查找其在 <code>A</code> 中的位置.</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (i &lt; segmentSamplesA) &#123;</span><br><span class="line">    uint dstPos = <span class="built_in">binarySearchExclusive</span>&lt;<span class="number">1U</span>&gt;(</span><br><span class="line">                      d_Ranks[i], d_Ranks + segmentSamplesA, segmentSamplesB,</span><br><span class="line">                      <span class="built_in">nextPowerOfTwo</span>(segmentSamplesB)) +</span><br><span class="line">                  i;</span><br><span class="line">    d_Limits[dstPos] = d_Ranks[i];</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>经过排序,
+实际上是把一个 <code>stride</code> 分为了 <code>2 * stride / SAMPLE_STRIDE</code> 个部分.
+划分的标准是每个 <code>SAMPLE_STRIDE</code> 的起始元素在 <code>A</code> 或 <code>B</code> 中的位置.</p>
+<h4 id="mergeElementaryIntervals"><a href="#mergeElementaryIntervals" class="headerlink" title="mergeElementaryIntervals"></a>mergeElementaryIntervals</h4><p>这一步合并 2 个 <code>stride</code>.
+调用 kernel 函数 <code>mergeElementaryIntervalsKernel</code>,
+其大小为 <code>&lt;&lt;&lt;N / SAMPLE_STRIDE, SAMPLE_STRIDE&gt;&gt;&gt;</code>.
+之前已经把每个 <code>stride</code> 分为了 <code>2 * SAMPLE_STRIDE</code> 个部分.
+每个 block 负责 2 个 <code>stride</code> 中对应的一部分,
+将他们合并.</p>
+<p>首先是把所有的 block 分组,
+每组有 <code>2 * stride / SAMPLE_STRIDE</code> 个 block.
+再计算组内 ID 和数据偏移.</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 组内 ID</span></span><br><span class="line"><span class="type">const</span> uint intervalI = blockIdx.x &amp; ((<span class="number">2</span> * stride) / SAMPLE_STRIDE - <span class="number">1</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 数据偏移</span></span><br><span class="line"><span class="type">const</span> uint segmentBase = (blockIdx.x - intervalI) * SAMPLE_STRIDE;</span><br><span class="line">d_SrcKey += segmentBase;</span><br><span class="line">d_SrcVal += segmentBase;</span><br><span class="line">d_DstKey += segmentBase;</span><br><span class="line">d_DstVal += segmentBase;</span><br></pre></td></tr></table></figure>
+
+<p>还需要计算合并后的起始位置,
+该 block 的合并长度等数据.</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">__shared__ uint startSrcA, startSrcB, lenSrcA, lenSrcB, startDstA, startDstB;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 本 block 读取数据的起始位置</span></span><br><span class="line">startSrcA = d_LimitsA[blockIdx.x];</span><br><span class="line">startSrcB = d_LimitsB[blockIdx.x];</span><br><span class="line"></span><br><span class="line"><span class="comment">// 本 block 读取数据的终止位置</span></span><br><span class="line"><span class="comment">// 下一个 block 读取数据的开始位置或者全 stride 长度</span></span><br><span class="line">uint endSrcA = (intervalI + <span class="number">1</span> &lt; segmentSamples) ? d_LimitsA[blockIdx.x + <span class="number">1</span>]</span><br><span class="line">                                                    : segmentElementsA;</span><br><span class="line">uint endSrcB = (intervalI + <span class="number">1</span> &lt; segmentSamples) ? d_LimitsB[blockIdx.x + <span class="number">1</span>]</span><br><span class="line">                                                    : segmentElementsB;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 本 block 读取的数据长度</span></span><br><span class="line">lenSrcA = endSrcA - startSrcA;</span><br><span class="line">lenSrcB = endSrcB - startSrcB;</span><br><span class="line"><span class="comment">// 本 block 合并完需要写入的起始位置</span></span><br><span class="line"><span class="comment">// A 的起始位置就是之前 block 的合并的长度和</span></span><br><span class="line"><span class="comment">// B 的起始位置就是 A 的起始位置 + 长度</span></span><br><span class="line">startDstA = startSrcA + startSrcB;</span><br><span class="line">startDstB = startDstA + lenSrcA;</span><br></pre></td></tr></table></figure>
+
+<p>把 global 内存中的数据加载到 shared 内存.</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (threadIdx.x &lt; lenSrcA) &#123;</span><br><span class="line">    s_key[threadIdx.x + <span class="number">0</span>] = d_SrcKey[<span class="number">0</span> + startSrcA + threadIdx.x];</span><br><span class="line">    s_val[threadIdx.x + <span class="number">0</span>] = d_SrcVal[<span class="number">0</span> + startSrcA + threadIdx.x];</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> (threadIdx.x &lt; lenSrcB) &#123;</span><br><span class="line">    s_key[threadIdx.x + SAMPLE_STRIDE] =</span><br><span class="line">        d_SrcKey[stride + startSrcB + threadIdx.x];</span><br><span class="line">    s_val[threadIdx.x + SAMPLE_STRIDE] =</span><br><span class="line">        d_SrcVal[stride + startSrcB + threadIdx.x];</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>调用 merge 函数合并 <code>s_key</code> 中的数据.
+<code>merge</code> 函数比较简单,
+找到每个元素合并后的位置.</p>
+<p>最后把数据存到 global 内存的对应位置.</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (threadIdx.x &lt; lenSrcA) &#123;</span><br><span class="line">    d_DstKey[startDstA + threadIdx.x] = s_key[threadIdx.x];</span><br><span class="line">    d_DstVal[startDstA + threadIdx.x] = s_val[threadIdx.x];</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> (threadIdx.x &lt; lenSrcB) &#123;</span><br><span class="line">    d_DstKey[startDstB + threadIdx.x] = s_key[lenSrcA + threadIdx.x];</span><br><span class="line">    d_DstVal[startDstB + threadIdx.x] = s_val[lenSrcA + threadIdx.x];</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://example.com/2024/09/28/merge-sort/" data-id="cm1lio2sl0000t3o494ez4xpz" data-title="merge_sort" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/CUDA/" rel="tag">CUDA</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
+    <article id="post-a-compile-error" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2024/09/28/a-compile-error/" class="article-date">
+  <time class="dt-published" datetime="2024-09-28T02:09:44.000Z" itemprop="datePublished">2024-09-28</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2024/09/28/a-compile-error/">记一次编译错误</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <p>我在照着<em>STL 源码刨析</em>写 STL 的时候出现了一个编译错误.
+当时的情况是我要用一个派生类的指针给一个基类指针的引用赋值,
+类似于:</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Base</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Derived</span> : <span class="keyword">public</span> Base &#123;&#125;;</span><br><span class="line"></span><br><span class="line">Derived *d = <span class="keyword">new</span> <span class="built_in">Derived</span>();</span><br><span class="line">Base *&amp;b = d;</span><br></pre></td></tr></table></figure>
+
+<p>但是编译器报错,
+错误信息类似于:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">error: cannot bind non-const lvalue reference of type ‘Base*&amp;’ to an rvalue of type ‘Base*’</span><br></pre></td></tr></table></figure>
+
+<p>在 C++ 中,
+派生类的指针可以直接给基类指针赋值以实现多态的特性.
+但是却不可以给基类指针的引用赋值.
+这个报错当时令我很困惑.
+经过查阅并分析报错信息,
+该语句的执行过程应该是首先创建了一个类型为 <code>Base*</code> 的临时值,
+用 <code>d</code> 来初始化,
+再把这个临时值赋予变量 <code>b</code>.
+因为这个临时值是右值不能给左值赋值,
+所有会有这个报错.</p>
+<p>这个问题可以用两种方式解决.</p>
+<p>第一种方式是通过常量引用可以指向右值实现的.
+就是把变量 <code>b</code> 声明为常量指针,
+即 <code>Base * const &amp;b = d</code>,
+这样就解决了这个问题.</p>
+<p>但是在我当时的代码中不能通过这个方法解决.
+因为报错的函数是红黑树的一个迭代函数,
+有可能改变 <code>d</code> 的值.
+这样的解决方法会复制 <code>d</code> 的值,
+使得函数内改变的局部值无法作用到外部的 <code>d</code> 上.</p>
+<p>第二种方式是先把 <code>d</code> 做一个强制类型转换再赋值给 <code>b</code>,
+即 <code>Base *&amp;b = (Base*&amp;)d</code>.
+这样就可以在函数中通过修改 <code>b</code> 的值修改 <code>d</code>.</p>
+<p>下面是一个示例代码.
+验证两种方法.</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Base</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Derived</span> : <span class="keyword">public</span> Base &#123;&#125;;</span><br><span class="line"></span><br><span class="line">Derived *pd = <span class="keyword">new</span> <span class="built_in">Derived</span>();</span><br><span class="line">Base * <span class="type">const</span> &amp;pb1 = pd;   <span class="comment">// 方法 1</span></span><br><span class="line">Base *&amp;pb2 = (Base*&amp;)pd;  <span class="comment">// 方法 2</span></span><br><span class="line"></span><br><span class="line">cout &lt;&lt; <span class="string">&quot;addr of pd:\t&quot;</span> &lt;&lt; &amp;pd &lt;&lt; endl;</span><br><span class="line">cout &lt;&lt; <span class="string">&quot;addr of pb1:\t&quot;</span> &lt;&lt; &amp;pb1 &lt;&lt; endl;</span><br><span class="line">cout &lt;&lt; <span class="string">&quot;addr of pb2:\t&quot;</span> &lt;&lt; &amp;pb2 &lt;&lt; endl;</span><br></pre></td></tr></table></figure>
+
+<p>编译没有报错,
+运行得到下面的结果:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">add of pd:	0x7ffcdec09978</span><br><span class="line">add of pb1:	0x7ffcdec09980</span><br><span class="line">add of pb2:	0x7ffcdec09978</span><br></pre></td></tr></table></figure>
+
+<p>说明方法 1 创建了一个新的指针,
+而方法 2 绑定在原来的指针上.</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://example.com/2024/09/28/a-compile-error/" data-id="cm1lilnat0000cqo45jasgvlz" data-title="记一次编译错误" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/C/" rel="tag">C++</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
     <article id="post-CMU15418-Assignment2" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
   <div class="article-meta">
     <a href="/2024/09/28/CMU15418-Assignment2/" class="article-date">
@@ -338,7 +621,7 @@ part 2 是在 global memory 上求 Exclusive Prefix Sum,
   <div class="widget-wrap">
     <h3 class="widget-title">Tags</h3>
     <div class="widget">
-      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/CMU-15418/" rel="tag">CMU-15418</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CUDA/" rel="tag">CUDA</a></li></ul>
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/C/" rel="tag">C++</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CMU-15418/" rel="tag">CMU-15418</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CUDA/" rel="tag">CUDA</a></li></ul>
     </div>
   </div>
 
@@ -348,7 +631,7 @@ part 2 是在 global memory 上求 Exclusive Prefix Sum,
   <div class="widget-wrap">
     <h3 class="widget-title">Tag Cloud</h3>
     <div class="widget tagcloud">
-      <a href="/tags/CMU-15418/" style="font-size: 10px;">CMU-15418</a> <a href="/tags/CUDA/" style="font-size: 10px;">CUDA</a>
+      <a href="/tags/C/" style="font-size: 10px;">C++</a> <a href="/tags/CMU-15418/" style="font-size: 10px;">CMU-15418</a> <a href="/tags/CUDA/" style="font-size: 20px;">CUDA</a>
     </div>
   </div>
 
@@ -368,6 +651,14 @@ part 2 是在 global memory 上求 Exclusive Prefix Sum,
     <h3 class="widget-title">Recent Posts</h3>
     <div class="widget">
       <ul>
+        
+          <li>
+            <a href="/2024/09/28/merge-sort/">merge_sort</a>
+          </li>
+        
+          <li>
+            <a href="/2024/09/28/a-compile-error/">记一次编译错误</a>
+          </li>
         
           <li>
             <a href="/2024/09/28/CMU15418-Assignment2/">CMU-15418 Assignment2 解析</a>

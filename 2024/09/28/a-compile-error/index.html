@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  
+  <title>记一次编译错误 | TechThings</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="我在照着STL 源码刨析写 STL 的时候出现了一个编译错误. 当时的情况是我要用一个派生类的指针给一个基类指针的引用赋值, 类似于: 12345class Base &#123;&#125;;class Derived : public Base &#123;&#125;;Derived *d &#x3D; new Derived();Base *&amp;b &#x3D; d;  但是编译器报错, 错误信息类似于">
+<meta property="og:type" content="article">
+<meta property="og:title" content="记一次编译错误">
+<meta property="og:url" content="http://example.com/2024/09/28/a-compile-error/index.html">
+<meta property="og:site_name" content="TechThings">
+<meta property="og:description" content="我在照着STL 源码刨析写 STL 的时候出现了一个编译错误. 当时的情况是我要用一个派生类的指针给一个基类指针的引用赋值, 类似于: 12345class Base &#123;&#125;;class Derived : public Base &#123;&#125;;Derived *d &#x3D; new Derived();Base *&amp;b &#x3D; d;  但是编译器报错, 错误信息类似于">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2024-09-28T02:09:44.000Z">
+<meta property="article:modified_time" content="2024-09-28T02:10:22.093Z">
+<meta property="article:author" content="John Doe">
+<meta property="article:tag" content="C++">
+<meta name="twitter:card" content="summary">
+  
+    <link rel="alternate" href="/atom.xml" title="TechThings" type="application/atom+xml">
+  
+  
+    <link rel="shortcut icon" href="/favicon.png">
+  
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+    
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.min.css">
+
+  
+  
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">TechThings</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"><span class="fa fa-bars"></span></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+        
+          <a class="nav-icon" href="/atom.xml" title="RSS Feed"><span class="fa fa-rss"></span></a>
+        
+        <a class="nav-icon nav-search-btn" title="Search"><span class="fa fa-search"></span></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://example.com"></form>
+      </div>
+    </div>
+  </div>
+</header>
+
+      <div class="outer">
+        <section id="main"><article id="post-a-compile-error" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2024/09/28/a-compile-error/" class="article-date">
+  <time class="dt-published" datetime="2024-09-28T02:09:44.000Z" itemprop="datePublished">2024-09-28</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="p-name article-title" itemprop="headline name">
+      记一次编译错误
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <p>我在照着<em>STL 源码刨析</em>写 STL 的时候出现了一个编译错误.
+当时的情况是我要用一个派生类的指针给一个基类指针的引用赋值,
+类似于:</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Base</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Derived</span> : <span class="keyword">public</span> Base &#123;&#125;;</span><br><span class="line"></span><br><span class="line">Derived *d = <span class="keyword">new</span> <span class="built_in">Derived</span>();</span><br><span class="line">Base *&amp;b = d;</span><br></pre></td></tr></table></figure>
+
+<p>但是编译器报错,
+错误信息类似于:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">error: cannot bind non-const lvalue reference of type ‘Base*&amp;’ to an rvalue of type ‘Base*’</span><br></pre></td></tr></table></figure>
+
+<p>在 C++ 中,
+派生类的指针可以直接给基类指针赋值以实现多态的特性.
+但是却不可以给基类指针的引用赋值.
+这个报错当时令我很困惑.
+经过查阅并分析报错信息,
+该语句的执行过程应该是首先创建了一个类型为 <code>Base*</code> 的临时值,
+用 <code>d</code> 来初始化,
+再把这个临时值赋予变量 <code>b</code>.
+因为这个临时值是右值不能给左值赋值,
+所有会有这个报错.</p>
+<p>这个问题可以用两种方式解决.</p>
+<p>第一种方式是通过常量引用可以指向右值实现的.
+就是把变量 <code>b</code> 声明为常量指针,
+即 <code>Base * const &amp;b = d</code>,
+这样就解决了这个问题.</p>
+<p>但是在我当时的代码中不能通过这个方法解决.
+因为报错的函数是红黑树的一个迭代函数,
+有可能改变 <code>d</code> 的值.
+这样的解决方法会复制 <code>d</code> 的值,
+使得函数内改变的局部值无法作用到外部的 <code>d</code> 上.</p>
+<p>第二种方式是先把 <code>d</code> 做一个强制类型转换再赋值给 <code>b</code>,
+即 <code>Base *&amp;b = (Base*&amp;)d</code>.
+这样就可以在函数中通过修改 <code>b</code> 的值修改 <code>d</code>.</p>
+<p>下面是一个示例代码.
+验证两种方法.</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Base</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Derived</span> : <span class="keyword">public</span> Base &#123;&#125;;</span><br><span class="line"></span><br><span class="line">Derived *pd = <span class="keyword">new</span> <span class="built_in">Derived</span>();</span><br><span class="line">Base * <span class="type">const</span> &amp;pb1 = pd;   <span class="comment">// 方法 1</span></span><br><span class="line">Base *&amp;pb2 = (Base*&amp;)pd;  <span class="comment">// 方法 2</span></span><br><span class="line"></span><br><span class="line">cout &lt;&lt; <span class="string">&quot;addr of pd:\t&quot;</span> &lt;&lt; &amp;pd &lt;&lt; endl;</span><br><span class="line">cout &lt;&lt; <span class="string">&quot;addr of pb1:\t&quot;</span> &lt;&lt; &amp;pb1 &lt;&lt; endl;</span><br><span class="line">cout &lt;&lt; <span class="string">&quot;addr of pb2:\t&quot;</span> &lt;&lt; &amp;pb2 &lt;&lt; endl;</span><br></pre></td></tr></table></figure>
+
+<p>编译没有报错,
+运行得到下面的结果:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">add of pd:	0x7ffcdec09978</span><br><span class="line">add of pb1:	0x7ffcdec09980</span><br><span class="line">add of pb2:	0x7ffcdec09978</span><br></pre></td></tr></table></figure>
+
+<p>说明方法 1 创建了一个新的指针,
+而方法 2 绑定在原来的指针上.</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://example.com/2024/09/28/a-compile-error/" data-id="cm1lilnat0000cqo45jasgvlz" data-title="记一次编译错误" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/C/" rel="tag">C++</a></li></ul>
+
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/2024/09/28/merge-sort/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Newer</strong>
+      <div class="article-nav-title">
+        
+          merge_sort
+        
+      </div>
+    </a>
+  
+  
+    <a href="/2024/09/28/CMU15418-Assignment2/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">CMU-15418 Assignment2 解析</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tags</h3>
+    <div class="widget">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/C/" rel="tag">C++</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CMU-15418/" rel="tag">CMU-15418</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CUDA/" rel="tag">CUDA</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tag Cloud</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/C/" style="font-size: 10px;">C++</a> <a href="/tags/CMU-15418/" style="font-size: 10px;">CMU-15418</a> <a href="/tags/CUDA/" style="font-size: 20px;">CUDA</a>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/09/">September 2024</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2024/09/28/merge-sort/">merge_sort</a>
+          </li>
+        
+          <li>
+            <a href="/2024/09/28/a-compile-error/">记一次编译错误</a>
+          </li>
+        
+          <li>
+            <a href="/2024/09/28/CMU15418-Assignment2/">CMU-15418 Assignment2 解析</a>
+          </li>
+        
+          <li>
+            <a href="/2024/09/28/hello-world/">Hello World</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      
+      &copy; 2024 John Doe<br>
+      Powered by <a href="https://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+
+<script src="/js/jquery-3.6.4.min.js"></script>
+
+
+
+  
+<script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+
+<script src="/js/script.js"></script>
+
+
+
+
+
+  </div>
+</body>
+</html>
