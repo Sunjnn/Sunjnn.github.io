@@ -1,734 +1,160 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  
-  
-  <title>TechThings</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <meta property="og:type" content="website">
+<!DOCTYPE html><html lang="en" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>TechThings</title><meta name="author" content="Sunjnn"><meta name="copyright" content="Sunjnn"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta property="og:type" content="website">
 <meta property="og:title" content="TechThings">
 <meta property="og:url" content="http://example.com/index.html">
 <meta property="og:site_name" content="TechThings">
 <meta property="og:locale" content="en_US">
-<meta property="article:author" content="John Doe">
+<meta property="og:image" content="http://example.com/img/butterfly-icon.png">
+<meta property="article:author" content="Sunjnn">
 <meta name="twitter:card" content="summary">
-  
-    <link rel="alternate" href="/atom.xml" title="TechThings" type="application/atom+xml">
-  
-  
-    <link rel="shortcut icon" href="/favicon.png">
-  
-  
-  
-<link rel="stylesheet" href="/css/style.css">
-
-  
-    
-<link rel="stylesheet" href="/fancybox/jquery.fancybox.min.css">
-
-  
-  
-<meta name="generator" content="Hexo 7.3.0"></head>
-
-<body>
-  <div id="container">
-    <div id="wrap">
-      <header id="header">
-  <div id="banner"></div>
-  <div id="header-outer" class="outer">
-    <div id="header-title" class="inner">
-      <h1 id="logo-wrap">
-        <a href="/" id="logo">TechThings</a>
-      </h1>
+<meta name="twitter:image" content="http://example.com/img/butterfly-icon.png"><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="http://example.com/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><script>
+    (() => {
       
-    </div>
-    <div id="header-inner" class="inner">
-      <nav id="main-nav">
-        <a id="main-nav-toggle" class="nav-icon"><span class="fa fa-bars"></span></a>
-        
-          <a class="main-nav-link" href="/">Home</a>
-        
-          <a class="main-nav-link" href="/archives">Archives</a>
-        
-      </nav>
-      <nav id="sub-nav">
-        
-        
-          <a class="nav-icon" href="/atom.xml" title="RSS Feed"><span class="fa fa-rss"></span></a>
-        
-        <a class="nav-icon nav-search-btn" title="Search"><span class="fa fa-search"></span></a>
-      </nav>
-      <div id="search-form-wrap">
-        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://example.com"></form>
-      </div>
-    </div>
-  </div>
-</header>
-
-      <div class="outer">
-        <section id="main">
-  
-    <article id="post-merge_sort" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
-  <div class="article-meta">
-    <a href="/2024/09/28/merge_sort/" class="article-date">
-  <time class="dt-published" datetime="2024-09-28T02:11:40.000Z" itemprop="datePublished">2024-09-28</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="p-name article-title" href="/2024/09/28/merge_sort/">merge sort</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="e-content article-entry" itemprop="articleBody">
-      
-        <p>本篇介绍 <a target="_blank" rel="noopener" href="https://github.com/NVIDIA/cuda-samples">cuda samples</a> 中的 <a target="_blank" rel="noopener" href="https://github.com/NVIDIA/cuda-samples/tree/master/Samples/0_Introduction/mergeSort">mergeSort</a>.</p>
-<p>大体上来讲,
-mergeSort 分为两个阶段.</p>
-<ol>
-<li>对含有 <code>SHARED_SIZE_LIMIT</code> (即 1024) 个元素的数组进行排序.</li>
-<li>合并多个有序数组.</li>
-</ol>
-<p>其中第一个阶段调用一次函数 <code>mergeSortShared</code> 结束.
-而第二个阶段需要循环调用三个函数: <code>generateSampleRanks</code>, <code>mergeRanksAndIndices</code> 和 <code>mergeElementaryIntervals</code>.
-我将分别讲述这两个阶段.</p>
-<h2 id="第一阶段-段内排序"><a href="#第一阶段-段内排序" class="headerlink" title="第一阶段: 段内排序"></a>第一阶段: 段内排序</h2><p>函数 <code>mergeSortShared</code> 比较简单,
-就是对完整的数据执行 <code>mergeSortSharedKernel</code> 函数.
-其函数声明为</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">template &lt;uint sortDir&gt;</span><br><span class="line">__global__ void mergeSortSharedKernel(uint *d_DstKey, uint *d_DstVal,</span><br><span class="line">                                      uint *d_SrcKey, uint *d_SrcVal,</span><br><span class="line">                                      uint arrayLength);</span><br></pre></td></tr></table></figure>
-
-<p>该 kernel 函数对一个长为 <code>arrayLength</code> 的数组排序,
-在代码中 <code>arrayLength</code> 接收的参数为宏变量 <code>SHARED_SIZE_LIMIT</code> (即 1024).
-调用该函数的 grid 和 block 大小分别为 <code>N / arrayLength</code> 和 <code>arrayLength / 2</code>.
-每个 block 排序一段长为 <code>arrayLength</code> 的数组.</p>
-<p>在函数 <code>mergeSortSharedKernel</code> 中排序通过一个循环进行.
-该循环在长度为 <code>stride</code> 的数组已经排序基础上,
-将 2 个长为 <code>stride</code> 的数组进行合并.
-因此 <code>stride</code> 的大小从 1 开始每次增大 1 倍直到 <code>arrayLength / 2</code>.
-在循环开始之前,
-长度 <code>stride</code> 的数组已经是排序了的状态.</p>
-<p>循环中数量为 <code>stride</code> 的 thread 为一组,
-排序相邻的两个长为 <code>stride</code> 的数组,
-记前一个数组为 <code>A</code>,
-后一个数组为 <code>B</code>.
-因此需要计算每一组 thread 内部的 thread ID 以及这组 thread 对应数据的起始位置.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 计算组内 thread ID, [0, thread)</span></span><br><span class="line">uint lPos = thread &amp; (stride - <span class="number">1</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 计算该组 thread 对应数据的起始位置</span></span><br><span class="line"><span class="comment">// 每组 thread 处理连续的两个 thread 数组</span></span><br><span class="line">uint *baseKey = s_key + <span class="number">2</span> * (threadIdx.x - lPos);</span><br></pre></td></tr></table></figure>
-
-<p>相对应的,
-每个 thread 在两个数组中都有一个对应的数据,
-分别为 <code>keyA</code> 和 <code>keyB</code>.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">uint keyA = baseKey[lPos + <span class="number">0</span>];</span><br><span class="line">uint keyB = baseKey[lPos + stride];</span><br></pre></td></tr></table></figure>
-
-<p>接下来找到 <code>keyA</code> 和 <code>keyB</code> 在两个数组合并后的位置.
-因为数组 <code>A</code> 和数组 <code>B</code> 都是排序的,
-因此在数组 <code>A</code> 中有 <code>lPos</code> 个数比 <code>keyA</code> 小,
-只需要找到在数组 <code>B</code> 中有多少个数比 <code>keyA</code> 小,
-两者相加就得到了 <code>keyA</code> 合并后的位置.
-这个寻找的过程可以通过二分法查找.
-<code>keyB</code> 同理也能找到合并后的位置.
-但是这里有个问题就是某个 thread 对应的 <code>keyA</code> 和 <code>keyB</code> 相同,
-那么这样计算得到的最后的位置也是相同的,
-产生了冲突.</p>
-<p>代码中解决这个可能的冲突的方法是 <code>keyA</code> 在数组 <code>B</code> 中寻找小于 <code>keyA</code> 的数,
-<code>keyB</code> 在数组 <code>A</code> 中寻找小于等于 <code>keyB</code> 的数.
-这样做的好处是保持了排序的稳定性.
-数组 <code>A</code> 的元素总是排在数组 <code>B</code> 的相同元素之前.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">uint posA = <span class="built_in">binarySearchExclusive</span>&lt;sortDir&gt;(keyA, baseKey + stride, stride, stride) + lPos;</span><br><span class="line">uint posB = <span class="built_in">binarySearchInclusive</span>&lt;sortDir&gt;(KeyB, baseKey + <span class="number">0</span>, stride, stride) + lPos;</span><br></pre></td></tr></table></figure>
-
-<p>函数 <code>binarySearchExclusive</code> 和 <code>binarySearchInclusive</code> 有着相似的结构,
-只有内部的微弱区别.
-通过二分法查找 <code>val</code> 在数组中的位置,
-即返回数组中小于 (<code>binarySearchExclusive</code>) 或小于等于 (binarySearchInclusive) <code>val</code> 的元素的数量.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// val 待查找的元素</span></span><br><span class="line"><span class="comment">// data 数组起始位置</span></span><br><span class="line"><span class="comment">// L 数组长度</span></span><br><span class="line"><span class="comment">// stride &gt;= L, 并行是 2 的整数幂</span></span><br><span class="line"><span class="keyword">template</span> &lt;uint sortDir&gt;</span><br><span class="line"><span class="function"><span class="type">static</span> <span class="keyword">inline</span> __device__ uint <span class="title">binarySearchExclusive</span><span class="params">(uint val, uint *data,</span></span></span><br><span class="line"><span class="params"><span class="function">                                                    uint L, uint stride)</span> </span>&#123;</span><br><span class="line">  <span class="keyword">if</span> (L == <span class="number">0</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  uint pos = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">for</span> (; stride &gt; <span class="number">0</span>; stride &gt;&gt;= <span class="number">1</span>) &#123;</span><br><span class="line">    uint newPos = <span class="built_in">umin</span>(pos + stride, L);</span><br><span class="line"></span><br><span class="line">	<span class="comment">// binarySearchInclusive 这里的 &lt; 变成 &lt;=</span></span><br><span class="line">    <span class="keyword">if</span> ((sortDir &amp;&amp; (data[newPos - <span class="number">1</span>] &lt; val)) ||</span><br><span class="line">        (!sortDir &amp;&amp; (data[newPos - <span class="number">1</span>] &gt; val))) &#123;</span><br><span class="line">      pos = newPos;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> pos;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>merge sort 的第一个阶段就完成了.
-该阶段将每 <code>SHARED_SIZE_LIMIT</code> (即 1024) 个元素进行排序,
-得到了 <code>N / SHARED_SIZE_LIMIT</code> 个有序数组.</p>
-<h2 id="第二阶段-合并有序段"><a href="#第二阶段-合并有序段" class="headerlink" title="第二阶段: 合并有序段"></a>第二阶段: 合并有序段</h2><p>第二个阶段循环合并连续 2 个长为 <code>stride</code> 的有序数组.
-因此 <code>stride</code> 的大小从 <code>SHARED_SIZE_LIMIT</code> (即 1024) 开始每次增大 1 倍直到 <code>N</code>.
-这个阶段主要分成三个部分: 生成排序, 合并排序和合并.
-也就是调用三个函数 <code>generateSampleRanks</code>, <code>mergeRanksAndIndices</code> 和 <code>mergeElementaryIntervals</code>.</p>
-<h3 id="思路解析"><a href="#思路解析" class="headerlink" title="思路解析"></a>思路解析</h3><p>要合并 2 个连续的有序数组,
-当然可以像第一阶段一样启动足够多的线程查找每个元素合并后的位置.
-但是这样的方法在后期的时延会增加很多,
-因为 <code>stride</code> 长度倍增.
-这里采用的方法是先分组再查找.
-要理解这部分的代码,
-需要理解数组 <code>d_RanksA</code>, <code>d_RanksB</code>, <code>d_LimitsA</code> 和 <code>d_LimitsB</code>.
-这个会在后面详细讲解.</p>
-<p>先把 <code>stride</code> 分为大小为 <code>SAMPLE_STRIDE</code> 的子数组.
-<code>d_RanksA</code> 表示 2 个 <code>stride</code> 中所有的子数组的起始元素在 <code>stride A</code> 中的位置,
-即 <code>A</code> 中小于 (或小于等于) 某个起始元素的元素数.
-这一部分对应的就是函数 <code>generateSampleRanks</code> 的部分.</p>
-<p>接着把 <code>d_RanksA</code> 排序,
-将排序后的值填入对应的 <code>d_LimitsA</code> 中.
-这一部分对应的就是函数 <code>mergeRanksAndIndices</code> 的部分.</p>
-<p>经过前两步,
-就把 <code>A</code> 和 <code>B</code> 每个都分为了 $2 \times stride &#x2F; SAMPLE_STRIDE$ 个范围.
-之后合并对应的范围就得到 2 个 <code>stride</code> 合并后的结果.
-这一部分对应的就是函数 <code>mergeElementaryIntervals</code>.</p>
-<h3 id="代码解析"><a href="#代码解析" class="headerlink" title="代码解析"></a>代码解析</h3><h4 id="generateSamplesRanks"><a href="#generateSamplesRanks" class="headerlink" title="generateSamplesRanks"></a>generateSamplesRanks</h4><p>这一步生成 <code>d_RanksA</code> 和 <code>d_RanksB</code>.
-通过 kernel 函数 <code>generateSampleRanksKernel</code> 实现的.
-无论 <code>stride</code> 大小,
-该 kernel 函数的总线程数都不变.
-就是 $N &#x2F; (2 \times SAMPLE_STRIDE)$.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 计算总线程数量</span></span><br><span class="line">uint lastSegmentElements = N % (<span class="number">2</span> * stride);</span><br><span class="line">uint threadCount =</span><br><span class="line">	(lastSegmentElements &gt; stride)</span><br><span class="line">	    ? (N + <span class="number">2</span> * stride - lastSegmentElements) / (<span class="number">2</span> * SAMPLE_STRIDE)</span><br><span class="line">        : (N - lastSegmentElements) / (<span class="number">2</span> * SAMPLE_STRIDE);</span><br></pre></td></tr></table></figure>
-
-<p>调用函数 <code>generateSampleRanksKernel</code> 的 grid 大小为 <code>threadCount / 256</code>,
-block 大小为 256.
-在该 kernel 函数中,
-把所有的线程分组.
-每 <code>stride / SAMPLE_STRIDE</code> 个线程组成一组.
-因此,
-每个线程的全局 ID 和组内 ID 可以通过如下方式计算.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 线程的全局 ID</span></span><br><span class="line">uint pos = blockIdx.x * blockDim.x + threadIdx.x;</span><br><span class="line"></span><br><span class="line"><span class="comment">// stride / SAMPLE_STRIDE 个线程为一组</span></span><br><span class="line"><span class="comment">// 线程的组内 ID</span></span><br><span class="line"><span class="type">const</span> uint i = pos &amp; ((stride / SAMPLE_STRIDE) - <span class="number">1</span>);</span><br></pre></td></tr></table></figure>
-
-<p>每个 thread 对应两个长为 <code>SAMPLE_STRIDE</code> 的数组以及 <code>d_RanksA</code> 和 <code>d_RanksB</code> 中的两个元素,
-就可以计算每个线程组的数据偏移量.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 计算每个线程组的数据偏移量</span></span><br><span class="line"><span class="type">const</span> uint segmentBase = (pos - i) * (<span class="number">2</span> * SAMPLE_STRIDE);</span><br><span class="line">d_SrcKey += segmentBase;</span><br><span class="line">d_RanksA += segmentBase / SAMPLE_STRIDE;</span><br><span class="line">d_RanksB += segmentBase / SAMPLE_STRIDE;</span><br></pre></td></tr></table></figure>
-
-<p>每个线程组对应连续 2 个长为 <code>stride</code> 的数组,
-前一个数组称为数组 <code>A</code>,
-后一个称为 <code>B</code>.
-每个线程在 <code>A</code> 和 <code>B</code> 中都有对应的一个长为 <code>SAMPLE_STRIDE</code> 的子数组.
-就可以计算得到 <code>A</code> 和 <code>B</code> 的长度以及子数组的个数.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// A 和 B 的长度</span></span><br><span class="line"><span class="type">const</span> uint segmentElementsA = stride;</span><br><span class="line"><span class="type">const</span> uint segmentElementsB = <span class="built_in">umin</span>(stride, N - segmentBase - stride);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 子数组的个数</span></span><br><span class="line"><span class="type">const</span> uint segmentSamplesA = <span class="built_in">getSampleCount</span>(segmentElementsA);</span><br><span class="line"><span class="type">const</span> uint segmentSamplesB = <span class="built_in">getSampleCount</span>(segmentElementsB);</span><br></pre></td></tr></table></figure>
-
-<p>最后求在 <code>A</code> 和 <code>B</code> 两个数组中,
-小于 (或者小于等于) 每个子数组起始元素的元素数.
-这也是通过 <code>binarySearchExclusive</code> 和 <code>binarySearchInclusive</code> 两个 kernel 函数完成.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (i &lt; segmentSamplesA) &#123;</span><br><span class="line">	d_RanksA[i] = i * SAMPLE_STRIDE;</span><br><span class="line">    d_RanksB[i] = <span class="built_in">binarySearchExclusive</span>&lt;sortDir&gt;(</span><br><span class="line">        d_SrcKey[i * SAMPLE_STRIDE], d_SrcKey + stride, segmentElementsB,</span><br><span class="line">        <span class="built_in">nextPowerOfTwo</span>(segmentElementsB));</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> (i &lt; segmentSamplesB) &#123;</span><br><span class="line">    d_RanksB[(stride / SAMPLE_STRIDE) + i] = i * SAMPLE_STRIDE;</span><br><span class="line">    d_RanksA[(stride / SAMPLE_STRIDE) + i] = <span class="built_in">binarySearchInclusive</span>&lt;sortDir&gt;(</span><br><span class="line">        d_SrcKey[stride + i * SAMPLE_STRIDE], d_SrcKey + <span class="number">0</span>, segmentElementsA,</span><br><span class="line">        <span class="built_in">nextPowerOfTwo</span>(segmentElementsA));</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<h4 id="mergeRanksAndIndices"><a href="#mergeRanksAndIndices" class="headerlink" title="mergeRanksAndIndices"></a>mergeRanksAndIndices</h4><p>这一步把 <code>d_RanksA</code> 和 <code>d_RanksB</code> 中的内容排序后赋值给 <code>d_LimitsA</code> 和 <code>d_LimitsB</code>.</p>
-<p>对 <code>A</code> 和 <code>B</code> 分别调用 kernel 函数 <code>mergeRanksAndIndicesKernel</code>,
-通过 <code>d_RanksA</code> 生成 <code>d_LimitsA</code>.
-该 kernel 函数有大小 <code>&lt;&lt;&lt;threadCount / 256, 256&gt;&gt;&gt;</code>.
-其中 <code>threadCount = N / (2 * SAMPLE_STRIDE)</code>.</p>
-<p>同样 <code>stride / SAMPLE_STRIDE</code> 个 thread 为一组.
-计算组内 ID 和数组偏移同之前一样.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// thread ID</span></span><br><span class="line">uint pos = blockIdx.x * blockDim.x + threadIdx.x;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 组内 ID</span></span><br><span class="line"><span class="type">const</span> uint i = pos &amp; ((stride / SAMPLE_STRIDE) - <span class="number">1</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 数组偏移</span></span><br><span class="line"><span class="type">const</span> uint segmentBase = (pos - i) * (<span class="number">2</span> * SAMPLE_STRIDE);</span><br><span class="line">d_Ranks += (pos - i) * <span class="number">2</span>;</span><br><span class="line">d_Limits += (pos - i) * <span class="number">2</span>;</span><br></pre></td></tr></table></figure>
-
-<p>需要将 <code>d_RanksA</code> 排序.
-对 <code>A</code> 中的每个 <code>d_RanksA</code> 查找其在 <code>B</code> 中的位置.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (i &lt; segmentSamplesA) &#123;</span><br><span class="line">    uint dstPos = <span class="built_in">binarySearchExclusive</span>&lt;<span class="number">1U</span>&gt;(</span><br><span class="line">                      d_Ranks[i], d_Ranks + segmentSamplesA, segmentSamplesB,</span><br><span class="line">                      <span class="built_in">nextPowerOfTwo</span>(segmentSamplesB)) +</span><br><span class="line">                  i;</span><br><span class="line">    d_Limits[dstPos] = d_Ranks[i];</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<p>同样,
-对 <code>B</code> 中的每个 <code>d_RanksA</code> 查找其在 <code>A</code> 中的位置.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (i &lt; segmentSamplesA) &#123;</span><br><span class="line">    uint dstPos = <span class="built_in">binarySearchExclusive</span>&lt;<span class="number">1U</span>&gt;(</span><br><span class="line">                      d_Ranks[i], d_Ranks + segmentSamplesA, segmentSamplesB,</span><br><span class="line">                      <span class="built_in">nextPowerOfTwo</span>(segmentSamplesB)) +</span><br><span class="line">                  i;</span><br><span class="line">    d_Limits[dstPos] = d_Ranks[i];</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>经过排序,
-实际上是把一个 <code>stride</code> 分为了 <code>2 * stride / SAMPLE_STRIDE</code> 个部分.
-划分的标准是每个 <code>SAMPLE_STRIDE</code> 的起始元素在 <code>A</code> 或 <code>B</code> 中的位置.</p>
-<h4 id="mergeElementaryIntervals"><a href="#mergeElementaryIntervals" class="headerlink" title="mergeElementaryIntervals"></a>mergeElementaryIntervals</h4><p>这一步合并 2 个 <code>stride</code>.
-调用 kernel 函数 <code>mergeElementaryIntervalsKernel</code>,
-其大小为 <code>&lt;&lt;&lt;N / SAMPLE_STRIDE, SAMPLE_STRIDE&gt;&gt;&gt;</code>.
-之前已经把每个 <code>stride</code> 分为了 <code>2 * SAMPLE_STRIDE</code> 个部分.
-每个 block 负责 2 个 <code>stride</code> 中对应的一部分,
-将他们合并.</p>
-<p>首先是把所有的 block 分组,
-每组有 <code>2 * stride / SAMPLE_STRIDE</code> 个 block.
-再计算组内 ID 和数据偏移.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 组内 ID</span></span><br><span class="line"><span class="type">const</span> uint intervalI = blockIdx.x &amp; ((<span class="number">2</span> * stride) / SAMPLE_STRIDE - <span class="number">1</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 数据偏移</span></span><br><span class="line"><span class="type">const</span> uint segmentBase = (blockIdx.x - intervalI) * SAMPLE_STRIDE;</span><br><span class="line">d_SrcKey += segmentBase;</span><br><span class="line">d_SrcVal += segmentBase;</span><br><span class="line">d_DstKey += segmentBase;</span><br><span class="line">d_DstVal += segmentBase;</span><br></pre></td></tr></table></figure>
-
-<p>还需要计算合并后的起始位置,
-该 block 的合并长度等数据.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">__shared__ uint startSrcA, startSrcB, lenSrcA, lenSrcB, startDstA, startDstB;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 本 block 读取数据的起始位置</span></span><br><span class="line">startSrcA = d_LimitsA[blockIdx.x];</span><br><span class="line">startSrcB = d_LimitsB[blockIdx.x];</span><br><span class="line"></span><br><span class="line"><span class="comment">// 本 block 读取数据的终止位置</span></span><br><span class="line"><span class="comment">// 下一个 block 读取数据的开始位置或者全 stride 长度</span></span><br><span class="line">uint endSrcA = (intervalI + <span class="number">1</span> &lt; segmentSamples) ? d_LimitsA[blockIdx.x + <span class="number">1</span>]</span><br><span class="line">                                                    : segmentElementsA;</span><br><span class="line">uint endSrcB = (intervalI + <span class="number">1</span> &lt; segmentSamples) ? d_LimitsB[blockIdx.x + <span class="number">1</span>]</span><br><span class="line">                                                    : segmentElementsB;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 本 block 读取的数据长度</span></span><br><span class="line">lenSrcA = endSrcA - startSrcA;</span><br><span class="line">lenSrcB = endSrcB - startSrcB;</span><br><span class="line"><span class="comment">// 本 block 合并完需要写入的起始位置</span></span><br><span class="line"><span class="comment">// A 的起始位置就是之前 block 的合并的长度和</span></span><br><span class="line"><span class="comment">// B 的起始位置就是 A 的起始位置 + 长度</span></span><br><span class="line">startDstA = startSrcA + startSrcB;</span><br><span class="line">startDstB = startDstA + lenSrcA;</span><br></pre></td></tr></table></figure>
-
-<p>把 global 内存中的数据加载到 shared 内存.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (threadIdx.x &lt; lenSrcA) &#123;</span><br><span class="line">    s_key[threadIdx.x + <span class="number">0</span>] = d_SrcKey[<span class="number">0</span> + startSrcA + threadIdx.x];</span><br><span class="line">    s_val[threadIdx.x + <span class="number">0</span>] = d_SrcVal[<span class="number">0</span> + startSrcA + threadIdx.x];</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> (threadIdx.x &lt; lenSrcB) &#123;</span><br><span class="line">    s_key[threadIdx.x + SAMPLE_STRIDE] =</span><br><span class="line">        d_SrcKey[stride + startSrcB + threadIdx.x];</span><br><span class="line">    s_val[threadIdx.x + SAMPLE_STRIDE] =</span><br><span class="line">        d_SrcVal[stride + startSrcB + threadIdx.x];</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>调用 merge 函数合并 <code>s_key</code> 中的数据.
-<code>merge</code> 函数比较简单,
-找到每个元素合并后的位置.</p>
-<p>最后把数据存到 global 内存的对应位置.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (threadIdx.x &lt; lenSrcA) &#123;</span><br><span class="line">    d_DstKey[startDstA + threadIdx.x] = s_key[threadIdx.x];</span><br><span class="line">    d_DstVal[startDstA + threadIdx.x] = s_val[threadIdx.x];</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> (threadIdx.x &lt; lenSrcB) &#123;</span><br><span class="line">    d_DstKey[startDstB + threadIdx.x] = s_key[lenSrcA + threadIdx.x];</span><br><span class="line">    d_DstVal[startDstB + threadIdx.x] = s_val[lenSrcA + threadIdx.x];</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://example.com/2024/09/28/merge_sort/" data-id="cm1lisoi70000lio45bo0f5wm" data-title="merge sort" class="article-share-link"><span class="fa fa-share">Share</span></a>
-      
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/CUDA/" rel="tag">CUDA</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-
-  
-    <article id="post-a-compile-error" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
-  <div class="article-meta">
-    <a href="/2024/09/28/a-compile-error/" class="article-date">
-  <time class="dt-published" datetime="2024-09-28T02:09:44.000Z" itemprop="datePublished">2024-09-28</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="p-name article-title" href="/2024/09/28/a-compile-error/">记一次编译错误</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="e-content article-entry" itemprop="articleBody">
-      
-        <p>我在照着<em>STL 源码刨析</em>写 STL 的时候出现了一个编译错误.
-当时的情况是我要用一个派生类的指针给一个基类指针的引用赋值,
-类似于:</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Base</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Derived</span> : <span class="keyword">public</span> Base &#123;&#125;;</span><br><span class="line"></span><br><span class="line">Derived *d = <span class="keyword">new</span> <span class="built_in">Derived</span>();</span><br><span class="line">Base *&amp;b = d;</span><br></pre></td></tr></table></figure>
-
-<p>但是编译器报错,
-错误信息类似于:</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">error: cannot bind non-const lvalue reference of type ‘Base*&amp;’ to an rvalue of type ‘Base*’</span><br></pre></td></tr></table></figure>
-
-<p>在 C++ 中,
-派生类的指针可以直接给基类指针赋值以实现多态的特性.
-但是却不可以给基类指针的引用赋值.
-这个报错当时令我很困惑.
-经过查阅并分析报错信息,
-该语句的执行过程应该是首先创建了一个类型为 <code>Base*</code> 的临时值,
-用 <code>d</code> 来初始化,
-再把这个临时值赋予变量 <code>b</code>.
-因为这个临时值是右值不能给左值赋值,
-所有会有这个报错.</p>
-<p>这个问题可以用两种方式解决.</p>
-<p>第一种方式是通过常量引用可以指向右值实现的.
-就是把变量 <code>b</code> 声明为常量指针,
-即 <code>Base * const &amp;b = d</code>,
-这样就解决了这个问题.</p>
-<p>但是在我当时的代码中不能通过这个方法解决.
-因为报错的函数是红黑树的一个迭代函数,
-有可能改变 <code>d</code> 的值.
-这样的解决方法会复制 <code>d</code> 的值,
-使得函数内改变的局部值无法作用到外部的 <code>d</code> 上.</p>
-<p>第二种方式是先把 <code>d</code> 做一个强制类型转换再赋值给 <code>b</code>,
-即 <code>Base *&amp;b = (Base*&amp;)d</code>.
-这样就可以在函数中通过修改 <code>b</code> 的值修改 <code>d</code>.</p>
-<p>下面是一个示例代码.
-验证两种方法.</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Base</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Derived</span> : <span class="keyword">public</span> Base &#123;&#125;;</span><br><span class="line"></span><br><span class="line">Derived *pd = <span class="keyword">new</span> <span class="built_in">Derived</span>();</span><br><span class="line">Base * <span class="type">const</span> &amp;pb1 = pd;   <span class="comment">// 方法 1</span></span><br><span class="line">Base *&amp;pb2 = (Base*&amp;)pd;  <span class="comment">// 方法 2</span></span><br><span class="line"></span><br><span class="line">cout &lt;&lt; <span class="string">&quot;addr of pd:\t&quot;</span> &lt;&lt; &amp;pd &lt;&lt; endl;</span><br><span class="line">cout &lt;&lt; <span class="string">&quot;addr of pb1:\t&quot;</span> &lt;&lt; &amp;pb1 &lt;&lt; endl;</span><br><span class="line">cout &lt;&lt; <span class="string">&quot;addr of pb2:\t&quot;</span> &lt;&lt; &amp;pb2 &lt;&lt; endl;</span><br></pre></td></tr></table></figure>
-
-<p>编译没有报错,
-运行得到下面的结果:</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">add of pd:	0x7ffcdec09978</span><br><span class="line">add of pb1:	0x7ffcdec09980</span><br><span class="line">add of pb2:	0x7ffcdec09978</span><br></pre></td></tr></table></figure>
-
-<p>说明方法 1 创建了一个新的指针,
-而方法 2 绑定在原来的指针上.</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://example.com/2024/09/28/a-compile-error/" data-id="cm1lilnat0000cqo45jasgvlz" data-title="记一次编译错误" class="article-share-link"><span class="fa fa-share">Share</span></a>
-      
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/C/" rel="tag">C++</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-
-  
-    <article id="post-CMU15418-Assignment2" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
-  <div class="article-meta">
-    <a href="/2024/09/28/CMU15418-Assignment2/" class="article-date">
-  <time class="dt-published" datetime="2024-09-28T01:21:46.000Z" itemprop="datePublished">2024-09-28</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="p-name article-title" href="/2024/09/28/CMU15418-Assignment2/">CMU-15418 Assignment2 解析</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="e-content article-entry" itemprop="articleBody">
-      
-        <p>这个作业有三个部分,
-都是 CUDA 编程.
-前两个比较简单,
-最后一个比较难.</p>
-<p>本文的运行环境:</p>
-<ul>
-<li>RTX 3090</li>
-<li>CUDA 12.2</li>
-</ul>
-<p><a target="_blank" rel="noopener" href="http://15418.courses.cs.cmu.edu/spring2016/article/4">作业描述</a>,
-<a target="_blank" rel="noopener" href="https://github.com/cmu15418/assignment2">原版代码链接</a>,
-<a target="_blank" rel="noopener" href="https://github.com/Sunjnn/CMU15418-Assignment2">我完成的代码链接</a>.</p>
-<h2 id="Part-1-SAXPY"><a href="#Part-1-SAXPY" class="headerlink" title="Part 1: SAXPY"></a>Part 1: SAXPY</h2><p>用 CUDA 实现一个在 GPU 上运行的 SAXPY 程序.
-输入两个数组 <code>X</code>, <code>Y</code>,
-以及一个常数 <code>scale</code>
-输出一个数组 <code>Z</code>,
-并且 <code>Z[i] = scale * X[i] + Y[i]</code>.</p>
-<p>直接访问和存储 global memory 就行.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">__global__ <span class="type">void</span></span></span><br><span class="line"><span class="function"><span class="title">saxpy_kernel</span><span class="params">(<span class="type">int</span> N, <span class="type">float</span> alpha, <span class="type">float</span>* x, <span class="type">float</span>* y, <span class="type">float</span>* result)</span> </span>&#123;</span><br><span class="line">    <span class="type">int</span> index = blockIdx.x * blockDim.x + threadIdx.x;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (index &lt; N)</span><br><span class="line">       result[index] = alpha * x[index] + y[index];</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>运行结果如下.
-相比于 Assignment 1 中的 CPU 实现有十几倍的提升.</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Overall time: 0.461 ms        [484.865 GB/s]</span><br></pre></td></tr></table></figure>
-
-<h2 id="part-2-Parallel-Prefix-Sum"><a href="#part-2-Parallel-Prefix-Sum" class="headerlink" title="part 2: Parallel Prefix-Sum"></a>part 2: Parallel Prefix-Sum</h2><p>这个 part 又分成两部分.
-一部分是 Exclusive Prefix Sum 的 CUDA 实现,
-另一部分是在此基础上实现的 Find Repeats</p>
-<h3 id="Exclusive-Prefix-Sum"><a href="#Exclusive-Prefix-Sum" class="headerlink" title="Exclusive Prefix Sum"></a>Exclusive Prefix Sum</h3><p>这部分需要实现一个求数组前缀和的程序,
-该前缀和不包括当前元素.
-即输入数组 <code>X</code>,
-输出数组 <code>Y</code>,
-其中 <code>Y[i] = sum(X[j], for j in [0, i-1])</code>.
-作业中给了 CPU 上的并行实现,
-这里只要把它移植到 CUDA 上就可以.
-CPU 上的实现分为三个部分:</p>
-<ol>
-<li>upsweep.</li>
-<li>设置结果数组的最后一位为 0.</li>
-<li>downsweep.</li>
-</ol>
-<p>作业中提供的 CPU 算法只适用于长度为 2 的整数幂的数组.
-当输入数组长度不满足要求时,
-在 GPU 上申请足够大的数组 (大于等于数组长度, 并且长度是 2 的整数幂),
-把数组复制到这段数组上,
-末尾置 0.
-在这段数组上执行 exclusive scan,
-把结果中的对应部分复制回 CPU.</p>
-<p>首先是三个辅助函数.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">__global__ <span class="type">void</span> <span class="title">upsweep</span><span class="params">(<span class="type">int</span>* device_result, <span class="type">int</span> N, <span class="type">int</span> twod)</span> </span>&#123;</span><br><span class="line">    <span class="type">size_t</span> id = blockDim.x * blockIdx.x + threadIdx.x;</span><br><span class="line">    <span class="type">size_t</span> twod1 = twod * <span class="number">2</span>;</span><br><span class="line">    <span class="type">size_t</span> i = id * twod1;</span><br><span class="line">    <span class="keyword">if</span> (i &lt; N)</span><br><span class="line">        device_result[i + twod1 - <span class="number">1</span>] += device_result[i + twod - <span class="number">1</span>];</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">__global__ <span class="type">void</span> <span class="title">downsweep</span><span class="params">(<span class="type">int</span>* device_result, <span class="type">int</span> N, <span class="type">int</span> twod)</span> </span>&#123;</span><br><span class="line">    <span class="type">size_t</span> id = blockDim.x * blockIdx.x + threadIdx.x;</span><br><span class="line">    <span class="type">size_t</span> twod1 = twod * <span class="number">2</span>;</span><br><span class="line">    <span class="type">size_t</span> i = id * twod1;</span><br><span class="line">    <span class="keyword">if</span> (i &lt; N) &#123;</span><br><span class="line">        <span class="type">int</span> t = device_result[i + twod - <span class="number">1</span>];</span><br><span class="line">        device_result[i + twod - <span class="number">1</span>] = device_result[i + twod1 - <span class="number">1</span>];</span><br><span class="line">        device_result[i + twod1 - <span class="number">1</span>] += t;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">__global__ <span class="type">void</span> <span class="title">set</span><span class="params">(<span class="type">int</span>* device_result, <span class="type">int</span> N, <span class="type">int</span> idx, <span class="type">int</span> value)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (idx &lt; N) device_result[idx] = value;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>接着实现 exclusive scan 函数.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">exclusive_scan</span><span class="params">(<span class="type">int</span>* device_start, <span class="type">int</span> length, <span class="type">int</span>* device_result)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    length = <span class="built_in">nextPow2</span>(length);</span><br><span class="line">    <span class="type">const</span> <span class="type">int</span> blockDim = <span class="number">256</span>;</span><br><span class="line">    <span class="type">const</span> <span class="type">int</span> gridDim  = (length + blockDim - <span class="number">1</span>) / blockDim;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> twod = <span class="number">1</span>; twod &lt; length; twod *= <span class="number">2</span>) &#123;</span><br><span class="line">        upsweep&lt;&lt;&lt;gridDim, blockDim&gt;&gt;&gt;(device_result, length, twod);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    set&lt;&lt;&lt;<span class="number">1</span>, <span class="number">1</span>&gt;&gt;&gt;(device_result, length, length - <span class="number">1</span>, <span class="number">0</span>);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> twod = length / <span class="number">2</span>; twod &gt;= <span class="number">1</span>; twod /= <span class="number">2</span>) &#123;</span><br><span class="line">        downsweep&lt;&lt;&lt;gridDim, blockDim&gt;&gt;&gt;(device_result, length, twod);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>运行测试程序查看得分.</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 测试程序</span></span><br><span class="line">make check_scan</span><br><span class="line"></span><br><span class="line"><span class="comment"># 测试结果</span></span><br><span class="line">-------------------------------------------------------------------------</span><br><span class="line">| Element Count   | Fast Time       | Your Time       | Score           |</span><br><span class="line">-------------------------------------------------------------------------</span><br><span class="line">| 10000           | 0.190           | 0.092           | 1.25            |</span><br><span class="line">| 100000          | 0.325           | 0.127           | 1.25            |</span><br><span class="line">| 1000000         | 0.481           | 0.293           | 1.25            |</span><br><span class="line">| 2000000         | 0.725           | 0.522           | 1.25            |</span><br><span class="line">-------------------------------------------------------------------------</span><br><span class="line">|                                   | Total score:    | 5/5             |</span><br><span class="line">-------------------------------------------------------------------------</span><br></pre></td></tr></table></figure>
-
-<h3 id="Find-Repeats"><a href="#Find-Repeats" class="headerlink" title="Find Repeats"></a>Find Repeats</h3><p>Find Repeats 是查找数组中的相邻重复元素,
-并把重复位置的序号按照先后顺序放到另一个数组中.
-输入数组 <code>X</code>,
-输出数组 <code>Y</code>,
-对于 <code>y = Y[i]</code> 有 <code>X[y] == X[y + 1]</code>.</p>
-<p>可以通过 Exclusive Prefix Sum 实现 Find Repeats.
-首先在数组 <code>X</code> 中查找重复元素得到重复数组 <code>flag</code>,
-若 <code>X[i] == X[i+1]</code>,
-则 <code>flag[i] = 1</code>.
-接着通过 Exclusive Prefix Sum 求 <code>flag</code> 的前缀和得到位置数组 <code>idx</code>.
-若 <code>flag[i] == 1</code>,
-则 <code>idx[i]</code> 表示了该元素在输出数组中的位置.
-最后把结果输出到数组 <code>Y</code>,
-若 <code>flag[i] == 1</code>,
-则 <code>Y[idx[i]] = i</code>.</p>
-<p>代码中 <code>findAdjacentSame</code> 实现查找重复元素和函数.
-这里通过 shared memory 加速该函数.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">__global__ <span class="type">void</span> <span class="title">findAdjacentSame</span><span class="params">(<span class="type">int</span>* device_input, <span class="type">int</span> length, <span class="type">int</span>* device_output)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">extern</span> __shared__ <span class="type">int</span> smem[];</span><br><span class="line"></span><br><span class="line">    <span class="type">size_t</span> global_idx = blockDim.x * blockIdx.x + threadIdx.x;</span><br><span class="line"></span><br><span class="line">    smem[threadIdx.x] = device_input[global_idx];</span><br><span class="line">    <span class="keyword">if</span> (threadIdx.x == blockDim.x - <span class="number">1</span>)</span><br><span class="line">        smem[blockDim.x] = device_input[global_idx + <span class="number">1</span>];</span><br><span class="line">    __syncthreads();</span><br><span class="line"></span><br><span class="line">    device_output[global_idx] = (smem[threadIdx.x] == smem[threadIdx.x + <span class="number">1</span>]);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">__global__ <span class="type">void</span> <span class="title">setRepeats</span><span class="params">(<span class="type">int</span>* device_idxs, <span class="type">int</span>* device_same, <span class="type">int</span> length, <span class="type">int</span>* device_output)</span> </span>&#123;</span><br><span class="line">    <span class="type">size_t</span> id = blockDim.x * blockIdx.x + threadIdx.x;</span><br><span class="line">    <span class="keyword">if</span> (device_same[id] == <span class="number">1</span>) &#123;</span><br><span class="line">        device_output[device_idxs[id]] = id;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">find_repeats</span><span class="params">(<span class="type">int</span> *device_input, <span class="type">int</span> length, <span class="type">int</span> *device_output)</span> </span>&#123;</span><br><span class="line">	<span class="comment">// device_same 就是上述的数组 flag</span></span><br><span class="line">	<span class="comment">// device_idxs 就是上述的数组 idx</span></span><br><span class="line">    <span class="type">int</span> *device_same;</span><br><span class="line">    <span class="type">int</span> *device_idxs;</span><br><span class="line">    <span class="built_in">cudaMalloc</span>(&amp;device_same, <span class="built_in">nextPow2</span>(length) * <span class="built_in">sizeof</span>(<span class="type">int</span>));</span><br><span class="line">    <span class="built_in">cudaMalloc</span>(&amp;device_idxs, <span class="built_in">nextPow2</span>(length) * <span class="built_in">sizeof</span>(<span class="type">int</span>));</span><br><span class="line"></span><br><span class="line">    <span class="type">size_t</span> blockDim = <span class="number">256</span>;</span><br><span class="line">    <span class="type">size_t</span> gridDim = (length + blockDim - <span class="number">1</span>) / blockDim;</span><br><span class="line"></span><br><span class="line">	<span class="comment">// 查找重复元素</span></span><br><span class="line">    findAdjacentSame&lt;&lt;&lt;gridDim, blockDim, (blockDim + <span class="number">1</span>) * <span class="built_in">sizeof</span>(<span class="type">int</span>)&gt;&gt;&gt;(device_input, length, device_same);</span><br><span class="line">	</span><br><span class="line">    <span class="built_in">cudaMemcpy</span>(device_idxs, device_same, <span class="built_in">nextPow2</span>(length) * <span class="built_in">sizeof</span>(<span class="type">int</span>), cudaMemcpyDeviceToDevice);</span><br><span class="line">	<span class="comment">// 对 flag 求前缀和</span></span><br><span class="line">    <span class="built_in">exclusive_scan</span>(device_input, length, device_idxs);</span><br><span class="line"></span><br><span class="line">	<span class="comment">// 输出结果</span></span><br><span class="line">    setRepeats&lt;&lt;&lt;gridDim, blockDim&gt;&gt;&gt;(device_idxs, device_same, length, device_output);</span><br><span class="line"></span><br><span class="line">    <span class="type">int</span> count;</span><br><span class="line">    <span class="built_in">cudaMemcpy</span>(&amp;count, device_idxs + length - <span class="number">1</span>, <span class="built_in">sizeof</span>(<span class="type">int</span>), cudaMemcpyDeviceToHost);</span><br><span class="line"></span><br><span class="line">    <span class="built_in">cudaFree</span>(device_same);</span><br><span class="line">    <span class="built_in">cudaFree</span>(device_idxs);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> count;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>运行测试程序查看得分.</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 测试程序</span></span><br><span class="line">make check_find_repeats</span><br><span class="line"></span><br><span class="line"><span class="comment"># 测试结果</span></span><br><span class="line">-------------------------------------------------------------------------</span><br><span class="line">| Element Count   | Fast Time       | Your Time       | Score           |</span><br><span class="line">-------------------------------------------------------------------------</span><br><span class="line">| 10000           | 0.227           | 0.087           | 1.25            |</span><br><span class="line">| 100000          | 0.384           | 0.142           | 1.25            |</span><br><span class="line">| 1000000         | 0.815           | 0.615           | 1.25            |</span><br><span class="line">| 2000000         | 1.243           | 0.942           | 1.25            |</span><br><span class="line">-------------------------------------------------------------------------</span><br><span class="line">|                                   | Total score:    | 5/5             |</span><br><span class="line">-------------------------------------------------------------------------</span><br></pre></td></tr></table></figure>
-
-<h2 id="Part-3-A-Simple-Circle-Renderer"><a href="#Part-3-A-Simple-Circle-Renderer" class="headerlink" title="Part 3: A Simple Circle Renderer"></a>Part 3: A Simple Circle Renderer</h2><p>这一部分要实现一个渲染器,
-作业代码中有实现可用的 <code>RefRenderer</code>,
-为渲染器的具体功能提供参考.
-这个渲染器主要用来渲染圆,
-由于不同的圆之间会有重叠,
-不同的计算顺序会导致重叠部分不同.
-CUDA 上的渲染器首先应该保证功能正确,
-即不同的圆在渲染的时候存在先后关系,
-必须按照给定的顺序渲染重叠部分.
-这部分主要就是修改文件 <code>cudaRenderer.cu</code> 中的函数 <code>kernelRenderCircles</code>.
-我也是经过了多次优化,
-才使得 <code>cudaRenderer</code> 的性能勉强达到要求.</p>
-<p>最开始的版本性能很低,
-仅能正确渲染图像.
-我考虑每个线程处理一个像素,
-按照顺序渲染每个圆.
-每个线程运行类似的代码,
-处理不同的数据,
-任务之间没有相互关系.
-这比较符合这门课的主题.
-就有了下面的代码.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// shared memory</span></span><br><span class="line"><span class="type">const</span> <span class="type">int</span> smem_size = SCAN_BLOCK_DIM;</span><br><span class="line">__shared__ <span class="type">float</span> smem_ps[smem_size * <span class="number">3</span>];</span><br><span class="line">__shared__ <span class="type">float</span> smem_rads[smem_size];</span><br><span class="line"></span><br><span class="line"><span class="function">__global__ <span class="type">void</span> <span class="title">kernelRenderCircles</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="type">int</span> pixelX = blockIdx.x * blockDim.x + threadIdx.x;</span><br><span class="line">    <span class="type">int</span> pixelY = blockIdx.y * blockDim.y + threadIdx.y;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> index = <span class="number">0</span>; index &lt; cuConstRendererParams.numCircles; ++index) &#123;</span><br><span class="line">        <span class="type">int</span> index3 = <span class="number">3</span> * index;</span><br><span class="line"></span><br><span class="line">		<span class="comment">// 这里所有线程从 global memory 中获取相同的数据, 带宽利用率极低, 因此可以考虑使用 shared memory 加速</span></span><br><span class="line">        float3 p = *(float3*)(&amp;cuConstRendererParams.position[index3]);</span><br><span class="line">        <span class="type">float</span>  rad = cuConstRendererParams.radius[index];</span><br><span class="line"></span><br><span class="line">        <span class="type">short</span> imageWidth = cuConstRendererParams.imageWidth;</span><br><span class="line">        <span class="type">short</span> imageHeight = cuConstRendererParams.imageHeight;</span><br><span class="line">        <span class="type">short</span> minX = <span class="built_in">static_cast</span>&lt;<span class="type">short</span>&gt;(imageWidth * (p.x - rad));</span><br><span class="line">        <span class="type">short</span> maxX = <span class="built_in">static_cast</span>&lt;<span class="type">short</span>&gt;(imageWidth * (p.x + rad)) + <span class="number">1</span>;</span><br><span class="line">        <span class="type">short</span> minY = <span class="built_in">static_cast</span>&lt;<span class="type">short</span>&gt;(imageHeight * (p.y - rad));</span><br><span class="line">        <span class="type">short</span> maxY = <span class="built_in">static_cast</span>&lt;<span class="type">short</span>&gt;(imageHeight * (p.y + rad)) + <span class="number">1</span>;</span><br><span class="line"></span><br><span class="line">        <span class="type">short</span> screenMinX = (minX &gt; <span class="number">0</span>) ? ((minX &lt; imageWidth) ? minX : imageWidth) : <span class="number">0</span>;</span><br><span class="line">        <span class="type">short</span> screenMaxX = (maxX &gt; <span class="number">0</span>) ? ((maxX &lt; imageWidth) ? maxX : imageWidth) : <span class="number">0</span>;</span><br><span class="line">        <span class="type">short</span> screenMinY = (minY &gt; <span class="number">0</span>) ? ((minY &lt; imageHeight) ? minY : imageHeight) : <span class="number">0</span>;</span><br><span class="line">        <span class="type">short</span> screenMaxY = (maxY &gt; <span class="number">0</span>) ? ((maxY &lt; imageHeight) ? maxY : imageHeight) : <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">        <span class="type">float</span> invWidth = <span class="number">1.f</span> / imageWidth;</span><br><span class="line">        <span class="type">float</span> invHeight = <span class="number">1.f</span> / imageHeight;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (pixelX &lt; screenMinX || pixelX &gt;= screenMaxX) <span class="keyword">continue</span>;</span><br><span class="line">        <span class="keyword">if</span> (pixelY &lt; screenMinY || pixelY &gt;= screenMaxY) <span class="keyword">continue</span>;</span><br><span class="line"></span><br><span class="line">        float4* imgPtr = (float4*)(&amp;cuConstRendererParams.imageData[<span class="number">4</span> * (pixelY * imageWidth + pixelX)]);</span><br><span class="line">        float2 pixelCenterNorm = <span class="built_in">make_float2</span>(invWidth * (<span class="built_in">static_cast</span>&lt;<span class="type">float</span>&gt;(pixelX) + <span class="number">0.5f</span>),</span><br><span class="line">                                             invHeight * (<span class="built_in">static_cast</span>&lt;<span class="type">float</span>&gt;(pixelY) + <span class="number">0.5f</span>));</span><br><span class="line"></span><br><span class="line">		<span class="comment">// imgPtr 位于 global memory 中, shadePixel 修改其内容使得性能低下</span></span><br><span class="line">        <span class="built_in">shadePixel</span>(index, pixelCenterNorm, p, imgPtr);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">static</span> <span class="keyword">inline</span></span></span><br><span class="line"><span class="function"><span class="type">size_t</span> <span class="title">didUp</span><span class="params">(<span class="type">size_t</span> a, <span class="type">size_t</span> b)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> (a + b - <span class="number">1</span>) / b;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span></span></span><br><span class="line"><span class="function"><span class="title">CudaRenderer::render</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 256 threads per block is a healthy number</span></span><br><span class="line">    <span class="function">dim3 <span class="title">blockDim</span><span class="params">(<span class="number">16</span>, <span class="number">16</span>)</span></span>;</span><br><span class="line">    <span class="function">dim3 <span class="title">gridDim</span><span class="params">(didUp(image-&gt;width, blockDim.x), didUp(image-&gt;height, blockDim.y))</span></span>;</span><br><span class="line"></span><br><span class="line">    kernelRenderCircles&lt;&lt;&lt;gridDim, blockDim&gt;&gt;&gt;();</span><br><span class="line">    <span class="built_in">cudaDeviceSynchronize</span>();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>上面这个版本的代码在第 10 行和 11 行处获取 global memory 的内容,
-但是一个 warp 内的所有线程访问相同的地址.
-我认为这会导致带宽利用率低,
-因此想通过 shared memory 改进这一块性能.
-另一方面,
-函数 <code>shadePixel</code> 中会修改 <code>imgPtr</code> 的内容,
-会使得线程反复访问 global memory,
-降低了函数的性能.
-因为每个线程处理一个像素,
-所以可以通过把 <code>imgPtr</code> 对应的数据读取到寄存器避免反复访问 global memory.</p>
-<p>但是实际修改了之后发现性能提升并不明显.
-经过分析,
-程序运行 rgb 渲染的时候性能还算可以,
-但是运行 rand10k 和 rand100k 的时候性能极低.
-这样的性能降低肯定是因为中间处理各个像素导致的,
-而不是两端的 global memory 访存.
-这是因为 rgb, rand10k 和 rand100k 两端的 global memory 访存相同.
-因此进一步的优化需要减少 <code>for</code> 循环中处理像素的时间.</p>
-<p>一个 block 有 256 个线程,
-渲染完整中一块大小为 <code>16 * 16</code> 部分的图像.
-这是比较小的,
-因此大部分的圆实际上都不会覆盖这一块图像.
-也就说对于一个 block 来讲,
-大部分圆是不需要渲染的.
-但是在 <code>for</code> 循环内部,
-256 个线程会同时计算同一个圆是否需要渲染,
-导致了相同的计算重复 256 次,
-降低了程序性能.</p>
-<p>为了改进程序性能,
-应该每个线程读取一个圆,
-判断这个圆是否与该 block 对应的图像相交,
-如果相交就留待计算.
-具体的步骤是设置一个数组 <code>need</code> 表示某个圆是否与这块图像相交.
-<code>need[i] = 1</code> 表示第 <code>i</code> 个圆与图像相交.
-接着再通过 part 2 中的 Exclusive Prefix Sum 对数组 <code>need</code> 求和得到数组 <code>idx</code>.
-当 <code>need[i]</code> 为 1 时,
-<code>idx[i]</code> 就表示需要处理的圆的序号.
-这把这些序号都整理到结果数组 <code>Y</code> 中,
-<code>Y</code> 中的每一个值都代表了该 block 需要渲染的圆的序号.
-接着就可以完成实际渲染的任务了.
-这样就有了下面这个版本的代码.
-part 2 是在 global memory 上求 Exclusive Prefix Sum,
-这里需要在 shared memory 上求.
-在文件 <code>exclusiveScan.cu_inl</code> 给出了求 shared memory 的例程 <code>sharedMemExclusiveScan</code>,
-可以直接调用.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// shared memory</span></span><br><span class="line"><span class="type">const</span> <span class="type">int</span> smem_size = SCAN_BLOCK_DIM;</span><br><span class="line">__shared__ <span class="type">float</span> smem_ps[smem_size * <span class="number">3</span>];</span><br><span class="line">__shared__ <span class="type">float</span> smem_colors[smem_size * <span class="number">3</span>];</span><br><span class="line">__shared__ <span class="type">float</span> smem_rads[smem_size];</span><br><span class="line">__shared__ uint smem_idxs[smem_size * <span class="number">2</span>];</span><br><span class="line">__shared__ uint smem_needs[smem_size];</span><br><span class="line">__shared__ uint smem_sums[smem_size];</span><br><span class="line"></span><br><span class="line"><span class="function">__global__ <span class="type">void</span> <span class="title">kernelRenderCircles</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    float4 img;</span><br><span class="line"></span><br><span class="line">    <span class="type">const</span> <span class="type">int</span> threadId = threadIdx.y * blockDim.x + threadIdx.x;</span><br><span class="line"></span><br><span class="line">    <span class="type">const</span> <span class="type">unsigned</span> <span class="type">int</span> globalIdX = blockIdx.x * blockDim.x + threadIdx.x;</span><br><span class="line">    <span class="type">const</span> <span class="type">unsigned</span> <span class="type">int</span> globalIdY = blockIdx.y * blockDim.y + threadIdx.y;</span><br><span class="line"></span><br><span class="line">    <span class="type">const</span> <span class="type">unsigned</span> <span class="type">int</span> x1 = blockIdx.x * blockDim.x;</span><br><span class="line">    <span class="type">const</span> <span class="type">unsigned</span> <span class="type">int</span> x2 = x1 + blockDim.x;</span><br><span class="line">    <span class="type">const</span> <span class="type">unsigned</span> <span class="type">int</span> y1 = blockIdx.y * blockDim.y;</span><br><span class="line">    <span class="type">const</span> <span class="type">unsigned</span> <span class="type">int</span> y2 = y1 + blockDim.y;</span><br><span class="line"></span><br><span class="line">    <span class="type">short</span> imageWidth = cuConstRendererParams.imageWidth;</span><br><span class="line">    <span class="type">short</span> imageHeight = cuConstRendererParams.imageHeight;</span><br><span class="line"></span><br><span class="line">	<span class="comment">// 读取 imageData 的数据到寄存器</span></span><br><span class="line">    img = *((float4*)(cuConstRendererParams.imageData) + globalIdY * imageWidth + globalIdX);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> index = <span class="number">0</span>; index &lt; cuConstRendererParams.numCircles; index += smem_size) &#123;</span><br><span class="line">        <span class="type">int</span> index3 = <span class="number">3</span> * index;</span><br><span class="line">        <span class="type">int</span> size = <span class="built_in">min</span>(smem_size, cuConstRendererParams.numCircles - index);</span><br><span class="line"></span><br><span class="line">		<span class="comment">// 先把 global memory 中的数据加载到 shared memory</span></span><br><span class="line">        __syncthreads();</span><br><span class="line">        <span class="keyword">if</span> (threadId &lt; size) &#123;</span><br><span class="line">            smem_ps[threadId] = __ldca(&amp;cuConstRendererParams.position[index3 + threadId]);</span><br><span class="line">            smem_ps[threadId + size] = __ldca(&amp;cuConstRendererParams.position[index3 + threadId + size]);</span><br><span class="line">            smem_ps[threadId + size * <span class="number">2</span>] = __ldca(&amp;cuConstRendererParams.position[index3 + threadId + size * <span class="number">2</span>]);</span><br><span class="line">            smem_rads[threadId] = __ldca(&amp;cuConstRendererParams.radius[index + threadId]);</span><br><span class="line">            smem_colors[threadId] = __ldca(&amp;cuConstRendererParams.color[index3 + threadId]);</span><br><span class="line">            smem_colors[threadId + size] = __ldca(&amp;cuConstRendererParams.color[index3 + threadId + size]);</span><br><span class="line">            smem_colors[threadId + size * <span class="number">2</span>] = __ldca(&amp;cuConstRendererParams.color[index3 + threadId + size * <span class="number">2</span>]);</span><br><span class="line">        &#125;</span><br><span class="line">        __syncthreads();</span><br><span class="line"></span><br><span class="line">        <span class="type">int</span> need_cal = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">		<span class="comment">// 判断哪些圆与本 block 对应的图像相交</span></span><br><span class="line">        <span class="keyword">if</span> (threadId &lt; size) &#123;</span><br><span class="line"></span><br><span class="line">            float3 p = ((float3*)smem_ps)[threadId];</span><br><span class="line">            <span class="type">float</span> rad = smem_rads[threadId];</span><br><span class="line"></span><br><span class="line">            <span class="type">short</span> minX = <span class="built_in">static_cast</span>&lt;<span class="type">short</span>&gt;(imageWidth * (p.x - rad));</span><br><span class="line">            <span class="type">short</span> maxX = <span class="built_in">static_cast</span>&lt;<span class="type">short</span>&gt;(imageWidth * (p.x + rad)) + <span class="number">1</span>;</span><br><span class="line">            <span class="type">short</span> minY = <span class="built_in">static_cast</span>&lt;<span class="type">short</span>&gt;(imageHeight * (p.y - rad));</span><br><span class="line">            <span class="type">short</span> maxY = <span class="built_in">static_cast</span>&lt;<span class="type">short</span>&gt;(imageHeight * (p.y + rad)) + <span class="number">1</span>;</span><br><span class="line"></span><br><span class="line">            <span class="type">short</span> screenMinX = (minX &gt; <span class="number">0</span>) ? ((minX &lt; imageWidth) ? minX : imageWidth) : <span class="number">0</span>;</span><br><span class="line">            <span class="type">short</span> screenMaxX = (maxX &gt; <span class="number">0</span>) ? ((maxX &lt; imageWidth) ? maxX : imageWidth) : <span class="number">0</span>;</span><br><span class="line">            <span class="type">short</span> screenMinY = (minY &gt; <span class="number">0</span>) ? ((minY &lt; imageHeight) ? minY : imageHeight) : <span class="number">0</span>;</span><br><span class="line">            <span class="type">short</span> screenMaxY = (maxY &gt; <span class="number">0</span>) ? ((maxY &lt; imageHeight) ? maxY : imageHeight) : <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">            need_cal = <span class="built_in">max</span>(screenMaxX, x2) - <span class="built_in">min</span>(screenMinX, x1) &lt; x2 - x1 + screenMaxX - screenMinX &amp;&amp;</span><br><span class="line">                       <span class="built_in">max</span>(screenMaxY, y2) - <span class="built_in">min</span>(screenMinY, y1) &lt; y2 - y1 + screenMaxY - screenMinY;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (threadId &lt; smem_size) &#123;</span><br><span class="line">            smem_sums[threadId] = need_cal;</span><br><span class="line">            smem_needs[threadId] = need_cal;</span><br><span class="line">            smem_idxs[threadId] = <span class="number">0</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        __syncthreads();</span><br><span class="line">        size = <span class="built_in">nextPow2</span>(size);</span><br><span class="line"></span><br><span class="line">		<span class="comment">// 通过 Exclusive Prefix Sum 求的相交圆的序号</span></span><br><span class="line">        <span class="built_in">sharedMemExclusiveScan</span>(threadId, smem_needs, smem_sums, smem_idxs, size);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (smem_needs[threadId] == <span class="number">1</span> &amp;&amp; threadId &lt; size) &#123;</span><br><span class="line">            smem_idxs[smem_sums[threadId]] = threadId;</span><br><span class="line">        &#125;</span><br><span class="line">        __syncthreads();</span><br><span class="line"></span><br><span class="line">        size = smem_sums[size - <span class="number">1</span>] + smem_needs[size - <span class="number">1</span>];</span><br><span class="line"></span><br><span class="line">		<span class="comment">// 渲染相交圆</span></span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; size; ++i) &#123;</span><br><span class="line">            float3 p = ((float3*)smem_ps)[smem_idxs[i]];</span><br><span class="line">            <span class="type">float</span> rad = smem_rads[smem_idxs[i]];</span><br><span class="line"></span><br><span class="line">            <span class="type">short</span> minX = <span class="built_in">static_cast</span>&lt;<span class="type">short</span>&gt;(imageWidth * (p.x - rad));</span><br><span class="line">            <span class="type">short</span> maxX = <span class="built_in">static_cast</span>&lt;<span class="type">short</span>&gt;(imageWidth * (p.x + rad)) + <span class="number">1</span>;</span><br><span class="line">            <span class="type">short</span> minY = <span class="built_in">static_cast</span>&lt;<span class="type">short</span>&gt;(imageHeight * (p.y - rad));</span><br><span class="line">            <span class="type">short</span> maxY = <span class="built_in">static_cast</span>&lt;<span class="type">short</span>&gt;(imageHeight * (p.y + rad)) + <span class="number">1</span>;</span><br><span class="line"></span><br><span class="line">            <span class="type">short</span> screenMinX = (minX &gt; <span class="number">0</span>) ? ((minX &lt; imageWidth) ? minX : imageWidth) : <span class="number">0</span>;</span><br><span class="line">            <span class="type">short</span> screenMaxX = (maxX &gt; <span class="number">0</span>) ? ((maxX &lt; imageWidth) ? maxX : imageWidth) : <span class="number">0</span>;</span><br><span class="line">            <span class="type">short</span> screenMinY = (minY &gt; <span class="number">0</span>) ? ((minY &lt; imageHeight) ? minY : imageHeight) : <span class="number">0</span>;</span><br><span class="line">            <span class="type">short</span> screenMaxY = (maxY &gt; <span class="number">0</span>) ? ((maxY &lt; imageHeight) ? maxY : imageHeight) : <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">            <span class="type">float</span> invWidth = <span class="number">1.f</span> / imageWidth;</span><br><span class="line">            <span class="type">float</span> invHeight = <span class="number">1.f</span> / imageHeight;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> (globalIdX &lt; screenMinX || globalIdX &gt;= screenMaxX) <span class="keyword">continue</span>;</span><br><span class="line">            <span class="keyword">if</span> (globalIdY &lt; screenMinY || globalIdY &gt;= screenMaxY) <span class="keyword">continue</span>;</span><br><span class="line">            float2 pixelCenterNorm = <span class="built_in">make_float2</span>(invWidth * (<span class="built_in">static_cast</span>&lt;<span class="type">float</span>&gt;(globalIdX) + <span class="number">0.5f</span>),</span><br><span class="line">                                                 invHeight * (<span class="built_in">static_cast</span>&lt;<span class="type">float</span>&gt;(globalIdY) + <span class="number">0.5f</span>));</span><br><span class="line">            <span class="built_in">shadePixel</span>(smem_idxs[i], pixelCenterNorm, p, &amp;img);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">	    &#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    *((float4*)(cuConstRendererParams.imageData) + globalIdY * imageWidth + globalIdX) = img;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>上述代码的性能得到了极大提高,
-但是距离要求还有一定的差距.
-看了知乎上的一篇<a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/683223356">解析</a>后,
-发现还有三处可以改进性能:</p>
-<ol>
-<li>判断圆与图像相交可以使用文件 <code>circleBoxTest.cu_inl</code> 中的函数 <code>circleInBoxConservative</code>.</li>
-<li>等到 <code>smem_idxs</code> 满了一并处理. 当前是把 256 个圆中需要渲染的部分抓紧处理, 每次可能只能处理 10 个圆左右. 因此可以每次把相交圆的 position, rad 和 color 存到 shared 中知道缓冲区满了再处理.</li>
-<li>把 position 和 rad 合并为一个 float4.</li>
-</ol>
-<p>再次修改就有了下面的代码.</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// shared memory</span></span><br><span class="line"><span class="type">const</span> <span class="type">int</span> smem_size = SCAN_BLOCK_DIM;</span><br><span class="line">__shared__ float4 smem_p_rad[smem_size];</span><br><span class="line">__shared__ float3 smem_colors[smem_size];</span><br><span class="line">__shared__ uint smem_scan_scratch[smem_size * <span class="number">2</span>];</span><br><span class="line">__shared__ uint smem_needs[smem_size];</span><br><span class="line">__shared__ uint smem_sums[smem_size];</span><br><span class="line"></span><br><span class="line"><span class="function">__device__ __inline__ <span class="type">void</span></span></span><br><span class="line"><span class="function"><span class="title">shadePixel</span><span class="params">(<span class="type">int</span> circleIndex, float2 pixelCenter, float4 p_rad, float4* imagePtr)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="type">float</span> diffX = p_rad.x - pixelCenter.x;</span><br><span class="line">    <span class="type">float</span> diffY = p_rad.y - pixelCenter.y;</span><br><span class="line">    <span class="type">float</span> pixelDist = diffX * diffX + diffY * diffY;</span><br><span class="line"></span><br><span class="line">    <span class="type">float</span> rad = p_rad.w;</span><br><span class="line">    <span class="type">float</span> maxDist = rad * rad;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (pixelDist &gt; maxDist)</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line"></span><br><span class="line">    float3 rgb;</span><br><span class="line">    <span class="type">float</span> alpha;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (cuConstRendererParams.sceneName == SNOWFLAKES || cuConstRendererParams.sceneName == SNOWFLAKES_SINGLE_FRAME) &#123;</span><br><span class="line"></span><br><span class="line">        <span class="type">const</span> <span class="type">float</span> kCircleMaxAlpha = <span class="number">.5f</span>;</span><br><span class="line">        <span class="type">const</span> <span class="type">float</span> falloffScale = <span class="number">4.f</span>;</span><br><span class="line"></span><br><span class="line">        <span class="type">float</span> normPixelDist = <span class="built_in">sqrt</span>(pixelDist) / rad;</span><br><span class="line">        rgb = <span class="built_in">lookupColor</span>(normPixelDist);</span><br><span class="line"></span><br><span class="line">        <span class="type">float</span> maxAlpha = <span class="number">.6f</span> + <span class="number">.4f</span> * (<span class="number">1.f</span>-p_rad.z);</span><br><span class="line">        maxAlpha = kCircleMaxAlpha * <span class="built_in">fmaxf</span>(<span class="built_in">fminf</span>(maxAlpha, <span class="number">1.f</span>), <span class="number">0.f</span>); <span class="comment">// kCircleMaxAlpha * clamped value</span></span><br><span class="line">        alpha = maxAlpha * <span class="built_in">exp</span>(<span class="number">-1.f</span> * falloffScale * normPixelDist * normPixelDist);</span><br><span class="line"></span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        rgb = smem_colors[circleIndex];</span><br><span class="line">        alpha = <span class="number">.5f</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="type">float</span> oneMinusAlpha = <span class="number">1.f</span> - alpha;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// BEGIN SHOULD-BE-ATOMIC REGION</span></span><br><span class="line"></span><br><span class="line">    float4 existingColor = *imagePtr;</span><br><span class="line">    float4 newColor;</span><br><span class="line">    newColor.x = alpha * rgb.x + oneMinusAlpha * existingColor.x;</span><br><span class="line">    newColor.y = alpha * rgb.y + oneMinusAlpha * existingColor.y;</span><br><span class="line">    newColor.z = alpha * rgb.z + oneMinusAlpha * existingColor.z;</span><br><span class="line">    newColor.w = alpha + existingColor.w;</span><br><span class="line"></span><br><span class="line">    *imagePtr = newColor;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// END SHOULD-BE-ATOMIC REGION</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">__global__ <span class="type">void</span> <span class="title">kernelRenderCircles</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    float4 img;</span><br><span class="line"></span><br><span class="line">    <span class="type">const</span> <span class="type">int</span> threadId = threadIdx.y * blockDim.x + threadIdx.x;</span><br><span class="line"></span><br><span class="line">    <span class="type">const</span> <span class="type">unsigned</span> <span class="type">int</span> globalIdX = blockIdx.x * blockDim.x + threadIdx.x;</span><br><span class="line">    <span class="type">const</span> <span class="type">unsigned</span> <span class="type">int</span> globalIdY = blockIdx.y * blockDim.y + threadIdx.y;</span><br><span class="line"></span><br><span class="line">    <span class="type">const</span> <span class="type">unsigned</span> <span class="type">int</span> x1 = blockIdx.x * blockDim.x;</span><br><span class="line">    <span class="type">const</span> <span class="type">unsigned</span> <span class="type">int</span> x2 = x1 + blockDim.x;</span><br><span class="line">    <span class="type">const</span> <span class="type">unsigned</span> <span class="type">int</span> y1 = blockIdx.y * blockDim.y;</span><br><span class="line">    <span class="type">const</span> <span class="type">unsigned</span> <span class="type">int</span> y2 = y1 + blockDim.y;</span><br><span class="line"></span><br><span class="line">    <span class="type">short</span> imageWidth = cuConstRendererParams.imageWidth;</span><br><span class="line">    <span class="type">short</span> imageHeight = cuConstRendererParams.imageHeight;</span><br><span class="line">    <span class="type">float</span> invWidth = <span class="number">1.f</span> / imageWidth;</span><br><span class="line">    <span class="type">float</span> invHeight = <span class="number">1.f</span> / imageHeight;</span><br><span class="line"></span><br><span class="line">    <span class="type">int</span> offset = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">	<span class="comment">// 读取 imageData 中的数据到寄存器</span></span><br><span class="line">    img = __ldcs((float4*)(cuConstRendererParams.imageData) + globalIdY * imageWidth + globalIdX);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> index = <span class="number">0</span>; index &lt; cuConstRendererParams.numCircles; index += smem_size) &#123;</span><br><span class="line">        <span class="type">int</span> size = <span class="built_in">min</span>(smem_size, cuConstRendererParams.numCircles - index);</span><br><span class="line">        <span class="type">int</span> need_cal = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">        float3 p = *((float3*)cuConstRendererParams.position + index + threadId);</span><br><span class="line">        float3 color = *((float3*)cuConstRendererParams.color + index + threadId);</span><br><span class="line">        <span class="type">float</span> rad = *(cuConstRendererParams.radius + index + threadId);</span><br><span class="line"></span><br><span class="line">		<span class="comment">// 判断圆与图像块是否相交</span></span><br><span class="line">        <span class="keyword">if</span> (threadId &lt; size) &#123;</span><br><span class="line">            need_cal = <span class="built_in">circleInBoxConservative</span>(p.x, p.y, rad, x1 * invWidth, x2 * invWidth, y2 * invHeight, y1 * invHeight);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (threadId &lt; smem_size) &#123;</span><br><span class="line">            smem_sums[threadId] = need_cal;</span><br><span class="line">            smem_needs[threadId] = need_cal;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        __syncthreads();</span><br><span class="line">        size = <span class="built_in">nextPow2</span>(size);</span><br><span class="line"></span><br><span class="line">        <span class="built_in">sharedMemExclusiveScan</span>(threadId, smem_needs, smem_sums, smem_scan_scratch, size);</span><br><span class="line">        __syncthreads();</span><br><span class="line">        size = smem_sums[size - <span class="number">1</span>] + smem_needs[size - <span class="number">1</span>];</span><br><span class="line">		<span class="comment">// 缓冲区满了就处理缓冲区的数据</span></span><br><span class="line">        <span class="keyword">if</span> (offset + size &gt; smem_size) &#123;</span><br><span class="line">            <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; offset; ++i) &#123;</span><br><span class="line">                float4 p_rad = smem_p_rad[i];</span><br><span class="line">    </span><br><span class="line">                float2 pixelCenterNorm = <span class="built_in">make_float2</span>(invWidth * (<span class="built_in">static_cast</span>&lt;<span class="type">float</span>&gt;(globalIdX) + <span class="number">0.5f</span>),</span><br><span class="line">                                                     invHeight * (<span class="built_in">static_cast</span>&lt;<span class="type">float</span>&gt;(globalIdY) + <span class="number">0.5f</span>));</span><br><span class="line">                <span class="built_in">shadePixel</span>(i, pixelCenterNorm, p_rad, &amp;img);</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            offset = <span class="number">0</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">		<span class="comment">// 缓冲区没满就把 position, rad 和 color 存到缓冲区</span></span><br><span class="line">        __syncthreads();</span><br><span class="line">        <span class="keyword">if</span> (smem_needs[threadId] == <span class="number">1</span> &amp;&amp; threadId &lt; smem_size) &#123;</span><br><span class="line">            smem_p_rad[smem_sums[threadId] + offset] = <span class="built_in">make_float4</span>(p.x, p.y, p.z, rad);</span><br><span class="line">            smem_colors[smem_sums[threadId] + offset] = color;</span><br><span class="line">        &#125;</span><br><span class="line">        offset += size;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">// 处理缓冲区剩下的内容</span></span><br><span class="line">    <span class="keyword">if</span> (offset) &#123;</span><br><span class="line">        __syncthreads();</span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; offset; ++i) &#123;</span><br><span class="line">            float4 p_rad = smem_p_rad[i];</span><br><span class="line"></span><br><span class="line">            float2 pixelCenterNorm = <span class="built_in">make_float2</span>(invWidth * (<span class="built_in">static_cast</span>&lt;<span class="type">float</span>&gt;(globalIdX) + <span class="number">0.5f</span>),</span><br><span class="line">                                                 invHeight * (<span class="built_in">static_cast</span>&lt;<span class="type">float</span>&gt;(globalIdY) + <span class="number">0.5f</span>));</span><br><span class="line">            <span class="built_in">shadePixel</span>(i, pixelCenterNorm, p_rad, &amp;img);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    __stwt((float4*)(cuConstRendererParams.imageData) + globalIdY * imageWidth + globalIdX, img);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>这样程序的性能勉强达到要求.
-经过测试,
-有一定几率拿到满分.</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 测试程序</span></span><br><span class="line">make check</span><br><span class="line"></span><br><span class="line"><span class="comment"># 测试结果</span></span><br><span class="line">-------------------------------------------------------------------------</span><br><span class="line">| Scene Name      | Fast Time (Tf)  | Your Time (T)   | Score           |</span><br><span class="line">-------------------------------------------------------------------------</span><br><span class="line">| rgb             | 0.0769          | 0.0920          | 12              |</span><br><span class="line">| rand10k         | 1.1239          | 1.0955          | 12              |</span><br><span class="line">| rand100k        | 10.7049         | 10.3191         | 12              |</span><br><span class="line">| pattern         | 0.1531          | 0.1693          | 12              |</span><br><span class="line">| snowsingle      | 7.1459          | 8.4992          | 11              |</span><br><span class="line">| biglittle       | 6.7287          | 3.8204          | 12              |</span><br><span class="line">-------------------------------------------------------------------------</span><br><span class="line">|                                   | Total score:    | 71/72           |</span><br><span class="line">-------------------------------------------------------------------------</span><br></pre></td></tr></table></figure>
-
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://example.com/2024/09/28/CMU15418-Assignment2/" data-id="cm1lhe1u40000x6o43e9egkl2" data-title="CMU-15418 Assignment2 解析" class="article-share-link"><span class="fa fa-share">Share</span></a>
-      
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/CMU-15418/" rel="tag">CMU-15418</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/CUDA/" rel="tag">CUDA</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-
-  
-    <article id="post-hello-world" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
-  <div class="article-meta">
-    <a href="/2024/09/28/hello-world/" class="article-date">
-  <time class="dt-published" datetime="2024-09-28T00:40:41.194Z" itemprop="datePublished">2024-09-28</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="p-name article-title" href="/2024/09/28/hello-world/">Hello World</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="e-content article-entry" itemprop="articleBody">
-      
-        <p>Welcome to <a target="_blank" rel="noopener" href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a target="_blank" rel="noopener" href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a target="_blank" rel="noopener" href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a target="_blank" rel="noopener" href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://example.com/2024/09/28/hello-world/" data-id="cm1lhe1u80001x6o4fu19easa" data-title="Hello World" class="article-share-link"><span class="fa fa-share">Share</span></a>
-      
-      
-      
-    </footer>
-  </div>
-  
-</article>
-
-
-
-  
-
-
-</section>
-        
-          <aside id="sidebar">
-  
-    
-
-  
-    
-  <div class="widget-wrap">
-    <h3 class="widget-title">Tags</h3>
-    <div class="widget">
-      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/C/" rel="tag">C++</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CMU-15418/" rel="tag">CMU-15418</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CUDA/" rel="tag">CUDA</a></li></ul>
-    </div>
-  </div>
-
-
-  
-    
-  <div class="widget-wrap">
-    <h3 class="widget-title">Tag Cloud</h3>
-    <div class="widget tagcloud">
-      <a href="/tags/C/" style="font-size: 10px;">C++</a> <a href="/tags/CMU-15418/" style="font-size: 10px;">CMU-15418</a> <a href="/tags/CUDA/" style="font-size: 20px;">CUDA</a>
-    </div>
-  </div>
-
-  
-    
-  <div class="widget-wrap">
-    <h3 class="widget-title">Archives</h3>
-    <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/09/">September 2024</a></li></ul>
-    </div>
-  </div>
-
-
-  
-    
-  <div class="widget-wrap">
-    <h3 class="widget-title">Recent Posts</h3>
-    <div class="widget">
-      <ul>
-        
-          <li>
-            <a href="/2024/09/28/merge_sort/">merge sort</a>
-          </li>
-        
-          <li>
-            <a href="/2024/09/28/a-compile-error/">记一次编译错误</a>
-          </li>
-        
-          <li>
-            <a href="/2024/09/28/CMU15418-Assignment2/">CMU-15418 Assignment2 解析</a>
-          </li>
-        
-          <li>
-            <a href="/2024/09/28/hello-world/">Hello World</a>
-          </li>
-        
-      </ul>
-    </div>
-  </div>
-
-  
-</aside>
-        
-      </div>
-      <footer id="footer">
-  
-  <div class="outer">
-    <div id="footer-info" class="inner">
-      
-      &copy; 2024 John Doe<br>
-      Powered by <a href="https://hexo.io/" target="_blank">Hexo</a>
-    </div>
-  </div>
-</footer>
-
-    </div>
-    <nav id="mobile-nav">
-  
-    <a href="/" class="mobile-nav-link">Home</a>
-  
-    <a href="/archives" class="mobile-nav-link">Archives</a>
-  
-</nav>
-    
-
-
-<script src="/js/jquery-3.6.4.min.js"></script>
-
-
-
-  
-<script src="/fancybox/jquery.fancybox.min.js"></script>
-
-
-
-
-<script src="/js/script.js"></script>
-
-
-
-
-
-  </div>
-<script type="text/x-mathjax-config">
-    MathJax.Hub.Config({
-        tex2jax: {
-            inlineMath: [ ["$","$"], ["\\(","\\)"] ],
-            skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
-            processEscapes: true
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
         }
-    });
-    MathJax.Hub.Queue(function() {
-        var all = MathJax.Hub.getAllJax();
-        for (var i = 0; i < all.length; ++i)
-            all[i].SourceElement().parentNode.className += ' has-jax';
-    });
-</script>
-<script src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-</body>
-</html>
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        if (name && globalFn[key][name]) return
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: 'Copy Successful',
+    error: 'Copy Failed',
+    noSupport: 'Browser Not Supported'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: 'Just now',
+    min: 'minutes ago',
+    hour: 'hours ago',
+    day: 'days ago',
+    month: 'months ago'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid/dist/infinitegrid.min.js',
+    buttonText: 'Load More'
+  },
+  isPhotoFigcaption: false,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'TechThings',
+  isPost: false,
+  isHome: true,
+  isHighlightShrink: false,
+  isToc: false,
+  postUpdate: '2024-10-09 18:43:39'
+}</script><meta name="generator" content="Hexo 7.3.0"></head><body><div class="page" id="body-wrap"><header class="full_page" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">TechThings</span></a></span><div id="menus"></div></nav><div id="site-info"><h1 id="site-title">TechThings</h1><div id="site_social_icons"><a class="social-icon" href="https://github.com/Sunjnn" target="_blank" title="GitHub"><i class="fab fa-github" style="color: #24292e;"></i></a></div></div><div id="scroll-down"><i class="fas fa-angle-down scroll-down-effects"></i></div></header><main class="layout" id="content-inner"><div class="recent-posts nc" id="recent-posts"><div class="recent-post-items"><div class="recent-post-item"><div class="recent-post-info"><a class="article-title" href="/2024/09/28/merge_sort/" title="merge sort">merge sort</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">Created</span><time datetime="2024-09-28T02:11:40.000Z" title="Created 2024-09-28 10:11:40">2024-09-28</time></span></div><div class="content">本篇介绍 cuda samples 中的 mergeSort. 大体上来讲, mergeSort 分为两个阶段.  对含有 SHARED_SIZE_LIMIT (即 1024) 个元素的数组进行排序. 合并多个有序数组.  其中第一个阶段调用一次函数 mergeSortShared 结束. 而第二个阶段需要循环调用三个函数: generateSampleRanks, mergeRanksAndIndices 和 mergeElementaryIntervals. 我将分别讲述这两个阶段. 第一阶段: 段内排序函数 mergeSortShared 比较简单, 就是对完整的数据执行 mergeSortSharedKernel 函数. 其函数声明为 1234template &lt;uint sortDir&gt;__global__ void mergeSortSharedKernel(uint *d_DstKey, uint *d_DstVal,                                      uint *d_SrcKey, uint...</div></div></div><div class="recent-post-item"><div class="recent-post-info"><a class="article-title" href="/2024/09/28/a-compile-error/" title="记一次编译错误">记一次编译错误</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">Created</span><time datetime="2024-09-28T02:09:44.000Z" title="Created 2024-09-28 10:09:44">2024-09-28</time></span></div><div class="content">我在照着STL 源码刨析写 STL 的时候出现了一个编译错误. 当时的情况是我要用一个派生类的指针给一个基类指针的引用赋值, 类似于: 12345class Base &#123;&#125;;class Derived : public Base &#123;&#125;;Derived *d = new Derived();Base *&amp;b = d;  但是编译器报错, 错误信息类似于: 1error: cannot bind non-const lvalue reference of type ‘Base*&amp;’ to an rvalue of type ‘Base*’  在 C++ 中, 派生类的指针可以直接给基类指针赋值以实现多态的特性. 但是却不可以给基类指针的引用赋值. 这个报错当时令我很困惑. 经过查阅并分析报错信息, 该语句的执行过程应该是首先创建了一个类型为 Base* 的临时值, 用 d 来初始化, 再把这个临时值赋予变量...</div></div></div><div class="recent-post-item"><div class="recent-post-info"><a class="article-title" href="/2024/09/28/CMU15418-Assignment2/" title="CMU-15418 Assignment2 解析">CMU-15418 Assignment2 解析</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">Created</span><time datetime="2024-09-28T01:21:46.000Z" title="Created 2024-09-28 09:21:46">2024-09-28</time></span></div><div class="content">这个作业有三个部分, 都是 CUDA 编程. 前两个比较简单, 最后一个比较难. 本文的运行环境:  RTX 3090 CUDA 12.2  作业描述, 原版代码链接, 我完成的代码链接. Part 1: SAXPY用 CUDA 实现一个在 GPU 上运行的 SAXPY 程序. 输入两个数组 X, Y, 以及一个常数 scale 输出一个数组 Z, 并且 Z[i] = scale * X[i] + Y[i]. 直接访问和存储 global memory 就行. 1234567__global__ voidsaxpy_kernel(int N, float alpha, float* x, float* y, float* result) &#123;    int index = blockIdx.x * blockDim.x + threadIdx.x;    if (index &lt; N)       result[index] = alpha * x[index] + y[index];&#125;  运行结果如下. 相比于 Assignment 1 中的 CPU...</div></div></div><div class="recent-post-item"><div class="recent-post-info"><a class="article-title" href="/2024/09/28/hello-world/" title="Hello World">Hello World</a><div class="article-meta-wrap"><span class="post-meta-date"><i class="far fa-calendar-alt"></i><span class="article-meta-label">Created</span><time datetime="2024-09-28T00:40:41.194Z" title="Created 2024-09-28 08:40:41">2024-09-28</time></span></div><div class="content">Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hexo, you can find the answer in troubleshooting or you can ask me on GitHub. Quick StartCreate a new post1$ hexo new &quot;My New Post&quot;  More info: Writing Run server1$ hexo server  More info: Server Generate static files1$ hexo generate  More info: Generating Deploy to remote sites1$ hexo deploy  More info: Deployment </div></div></div></div><nav id="pagination"><div class="pagination"><span class="page-number current">1</span></div></nav></div><div class="aside-content" id="aside-content"><div class="card-widget card-info is-center"><div class="avatar-img"><img src="/img/butterfly-icon.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Sunjnn</div><div class="author-info-description"></div><div class="site-data"><a href="/archives/"><div class="headline">Articles</div><div class="length-num">4</div></a><a href="/tags/"><div class="headline">Tags</div><div class="length-num">3</div></a><a href="/categories/"><div class="headline">Categories</div><div class="length-num">0</div></a></div><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/Sunjnn" target="_blank" title="GitHub"><i class="fab fa-github" style="color: #24292e;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>Announcement</span></div><div class="announcement_content">This is my Blog</div></div><div class="sticky_layout"><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>Recent Posts</span></div><div class="aside-list"><div class="aside-list-item"><div class="content"><a class="title" href="/2024/09/28/merge_sort/" title="merge sort">merge sort</a><time datetime="2024-09-28T02:11:40.000Z" title="Created 2024-09-28 10:11:40">2024-09-28</time></div></div><div class="aside-list-item"><div class="content"><a class="title" href="/2024/09/28/a-compile-error/" title="记一次编译错误">记一次编译错误</a><time datetime="2024-09-28T02:09:44.000Z" title="Created 2024-09-28 10:09:44">2024-09-28</time></div></div><div class="aside-list-item"><div class="content"><a class="title" href="/2024/09/28/CMU15418-Assignment2/" title="CMU-15418 Assignment2 解析">CMU-15418 Assignment2 解析</a><time datetime="2024-09-28T01:21:46.000Z" title="Created 2024-09-28 09:21:46">2024-09-28</time></div></div><div class="aside-list-item"><div class="content"><a class="title" href="/2024/09/28/hello-world/" title="Hello World">Hello World</a><time datetime="2024-09-28T00:40:41.194Z" title="Created 2024-09-28 08:40:41">2024-09-28</time></div></div></div></div><div class="card-widget card-tags"><div class="item-headline"><i class="fas fa-tags"></i><span>Tags</span></div><div class="card-tag-cloud"><a href="/tags/CUDA/" style="font-size: 1.5em; color: #99a9bf">CUDA</a> <a href="/tags/C/" style="font-size: 1.1em; color: #999">C++</a> <a href="/tags/CMU-15418/" style="font-size: 1.1em; color: #999">CMU-15418</a></div></div><div class="card-widget card-archives">
+    <div class="item-headline">
+      <i class="fas fa-archive"></i>
+      <span>Archives</span>
+      
+    </div>
+    <ul class="card-archive-list">
+  
+      <li class="card-archive-list-item">
+        <a class="card-archive-list-link" href="/archives/2024/09/">
+          <span class="card-archive-list-date">September 2024</span>
+          <span class="card-archive-list-count">4</span>
+        </a>
+      </li>
+    </ul></div><div class="card-widget card-webinfo"><div class="item-headline"><i class="fas fa-chart-line"></i><span>Website Info</span></div><div class="webinfo"><div class="webinfo-item"><div class="item-name">Article Count :</div><div class="item-count">4</div></div><div class="webinfo-item"><div class="item-name">Unique Visitors :</div><div class="item-count" id="busuanzi_value_site_uv"><i class="fa-solid fa-spinner fa-spin"></i></div></div><div class="webinfo-item"><div class="item-name">Page Views :</div><div class="item-count" id="busuanzi_value_site_pv"><i class="fa-solid fa-spinner fa-spin"></i></div></div><div class="webinfo-item"><div class="item-name">Last Update :</div><div class="item-count" id="last-push-date" data-lastPushDate="2024-10-09T10:43:39.043Z"><i class="fa-solid fa-spinner fa-spin"></i></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2019 - 2024 By Sunjnn</div><div class="framework-info"><span>Framework </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>Theme </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="darkmode" type="button" title="Toggle Between Light and Dark Mode"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="Toggle Between Single-column and Double-column"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="Settings"><i class="fas fa-cog fa-spin"></i></button><button id="go-up" type="button" title="Back to Top"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js"></script><script src="/js/main.js"></script><div class="js-pjax"></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
