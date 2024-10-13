@@ -2,7 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
-    <loc>http://example.com/tags/index.html</loc>
+    <loc>https://sunjnn.github.io/tags/index.html</loc>
     
     <lastmod>2024-10-13</lastmod>
     
@@ -11,7 +11,7 @@
   </url>
   
   <url>
-    <loc>http://example.com/2024/09/28/merge_sort/</loc>
+    <loc>https://sunjnn.github.io/2024/09/28/merge_sort/</loc>
     
     <lastmod>2024-10-13</lastmod>
     
@@ -20,7 +20,7 @@
   </url>
   
   <url>
-    <loc>http://example.com/2024/09/28/CMU15418-Assignment2/</loc>
+    <loc>https://sunjnn.github.io/2024/09/28/CMU15418-Assignment2/</loc>
     
     <lastmod>2024-09-29</lastmod>
     
@@ -29,7 +29,7 @@
   </url>
   
   <url>
-    <loc>http://example.com/2024/09/28/a-compile-error/</loc>
+    <loc>https://sunjnn.github.io/2024/09/28/a-compile-error/</loc>
     
     <lastmod>2024-09-28</lastmod>
     
@@ -39,7 +39,7 @@
   
 
   <url>
-    <loc>http://example.com/</loc>
+    <loc>https://sunjnn.github.io/</loc>
     <lastmod>2024-10-13</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
@@ -47,21 +47,21 @@
 
   
   <url>
-    <loc>http://example.com/tags/CUDA/</loc>
+    <loc>https://sunjnn.github.io/tags/CUDA/</loc>
     <lastmod>2024-10-13</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>
   </url>
   
   <url>
-    <loc>http://example.com/tags/CMU-15418/</loc>
+    <loc>https://sunjnn.github.io/tags/CMU-15418/</loc>
     <lastmod>2024-10-13</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>
   </url>
   
   <url>
-    <loc>http://example.com/tags/C/</loc>
+    <loc>https://sunjnn.github.io/tags/C/</loc>
     <lastmod>2024-10-13</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.2</priority>
