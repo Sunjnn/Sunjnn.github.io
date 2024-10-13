@@ -3,6 +3,6 @@ http://example.com/2024/09/28/merge_sort/
 http://example.com/2024/09/28/CMU15418-Assignment2/
 http://example.com/2024/09/28/a-compile-error/
 http://example.com/
-http://example.com/tags/C/
 http://example.com/tags/CUDA/
 http://example.com/tags/CMU-15418/
+http://example.com/tags/C/
