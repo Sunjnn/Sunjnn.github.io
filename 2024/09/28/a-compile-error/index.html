@@ -124,13 +124,14 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">4</span>
+          <span class="site-state-item-count">3</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
+          <a href="/tags/">
         <span class="site-state-item-count">3</span>
-        <span class="site-state-item-name">tags</span>
+        <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>
 </div>
@@ -212,43 +213,43 @@
     
     
     
-    <div class="post-body" itemprop="articleBody"><p>我在照着<em>STL 源码刨析</em>写 STL 的时候出现了一个编译错误.<br />
-当时的情况是我要用一个派生类的指针给一个基类指针的引用赋值,<br />
+    <div class="post-body" itemprop="articleBody"><p>我在照着<em>STL 源码刨析</em>写 STL 的时候出现了一个编译错误.
+当时的情况是我要用一个派生类的指针给一个基类指针的引用赋值,
 类似于:</p>
 <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Base</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Derived</span> : <span class="keyword">public</span> Base &#123;&#125;;</span><br><span class="line"></span><br><span class="line">Derived *d = <span class="keyword">new</span> <span class="built_in">Derived</span>();</span><br><span class="line">Base *&amp;b = d;</span><br></pre></td></tr></table></figure>
-<p>但是编译器报错,<br />
+<p>但是编译器报错,
 错误信息类似于:</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">error: cannot bind non-const lvalue reference of type ‘Base*&amp;’ to an rvalue of type ‘Base*’</span><br></pre></td></tr></table></figure>
-<p>在 C++ 中,<br />
-派生类的指针可以直接给基类指针赋值以实现多态的特性.<br />
-但是却不可以给基类指针的引用赋值.<br />
-这个报错当时令我很困惑.<br />
-经过查阅并分析报错信息,<br />
-该语句的执行过程应该是首先创建了一个类型为 <code>Base*</code> 的临时值,<br />
-用 <code>d</code> 来初始化,<br />
-再把这个临时值赋予变量 <code>b</code>.<br />
-因为这个临时值是右值不能给左值赋值,<br />
+<p>在 C++ 中,
+派生类的指针可以直接给基类指针赋值以实现多态的特性.
+但是却不可以给基类指针的引用赋值.
+这个报错当时令我很困惑.
+经过查阅并分析报错信息,
+该语句的执行过程应该是首先创建了一个类型为 <code>Base*</code> 的临时值,
+用 <code>d</code> 来初始化,
+再把这个临时值赋予变量 <code>b</code>.
+因为这个临时值是右值不能给左值赋值,
 所有会有这个报错.</p>
 <p>这个问题可以用两种方式解决.</p>
-<p>第一种方式是通过常量引用可以指向右值实现的.<br />
-就是把变量 <code>b</code> 声明为常量指针,<br />
-即 <code>Base * const &amp;b = d</code>,<br />
+<p>第一种方式是通过常量引用可以指向右值实现的.
+就是把变量 <code>b</code> 声明为常量指针,
+即 <code>Base * const &amp;b = d</code>,
 这样就解决了这个问题.</p>
-<p>但是在我当时的代码中不能通过这个方法解决.<br />
-因为报错的函数是红黑树的一个迭代函数,<br />
-有可能改变 <code>d</code> 的值.<br />
-这样的解决方法会复制 <code>d</code> 的值,<br />
+<p>但是在我当时的代码中不能通过这个方法解决.
+因为报错的函数是红黑树的一个迭代函数,
+有可能改变 <code>d</code> 的值.
+这样的解决方法会复制 <code>d</code> 的值,
 使得函数内改变的局部值无法作用到外部的 <code>d</code> 上.</p>
-<p>第二种方式是先把 <code>d</code> 做一个强制类型转换再赋值给 <code>b</code>,<br />
-即 <code>Base *&amp;b = (Base*&amp;)d</code>.<br />
+<p>第二种方式是先把 <code>d</code> 做一个强制类型转换再赋值给 <code>b</code>,
+即 <code>Base *&amp;b = (Base*&amp;)d</code>.
 这样就可以在函数中通过修改 <code>b</code> 的值修改 <code>d</code>.</p>
-<p>下面是一个示例代码.<br />
+<p>下面是一个示例代码.
 验证两种方法.</p>
 <figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Base</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Derived</span> : <span class="keyword">public</span> Base &#123;&#125;;</span><br><span class="line"></span><br><span class="line">Derived *pd = <span class="keyword">new</span> <span class="built_in">Derived</span>();</span><br><span class="line">Base * <span class="type">const</span> &amp;pb1 = pd;   <span class="comment">// 方法 1</span></span><br><span class="line">Base *&amp;pb2 = (Base*&amp;)pd;  <span class="comment">// 方法 2</span></span><br><span class="line"></span><br><span class="line">cout &lt;&lt; <span class="string">&quot;addr of pd:\t&quot;</span> &lt;&lt; &amp;pd &lt;&lt; endl;</span><br><span class="line">cout &lt;&lt; <span class="string">&quot;addr of pb1:\t&quot;</span> &lt;&lt; &amp;pb1 &lt;&lt; endl;</span><br><span class="line">cout &lt;&lt; <span class="string">&quot;addr of pb2:\t&quot;</span> &lt;&lt; &amp;pb2 &lt;&lt; endl;</span><br></pre></td></tr></table></figure>
-<p>编译没有报错,<br />
+<p>编译没有报错,
 运行得到下面的结果:</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">add of pd:	0x7ffcdec09978</span><br><span class="line">add of pb1:	0x7ffcdec09980</span><br><span class="line">add of pb2:	0x7ffcdec09978</span><br></pre></td></tr></table></figure>
-<p>说明方法 1 创建了一个新的指针,<br />
+<p>说明方法 1 创建了一个新的指针,
 而方法 2 绑定在原来的指针上.</p>
 
     </div>
